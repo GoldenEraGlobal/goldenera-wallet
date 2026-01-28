@@ -143,6 +143,11 @@ LOGGING_LEVEL_GLOBAL_GOLDENERA=INFO
 # Global rate limit (requests per second per IP)
 THROTTLING_GLOBAL_CAPACITY=500
 THROTTLING_GLOBAL_REFILL_TOKENS=500
+
+# PUBLIC CORE (Per IP) - Unauthenticated access to Core
+# Strict: 100 tokens capacity, refills 50 per second.
+THROTTLING_PUBLIC_CORE_CAPACITY=100
+THROTTLING_PUBLIC_CORE_REFILL_TOKENS=50
 ```
 
 ### 4. Configuration Guide

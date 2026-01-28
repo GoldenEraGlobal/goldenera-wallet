@@ -12,7 +12,6 @@ WORKDIR /app-frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 COPY frontend/apps/web/package.json ./apps/web/
 COPY frontend/packages/api/package.json ./packages/api/
-COPY frontend/packages/config/package.json ./packages/config/
 COPY frontend/packages/core/package.json ./packages/core/
 COPY frontend/packages/ui/package.json ./packages/ui/
 

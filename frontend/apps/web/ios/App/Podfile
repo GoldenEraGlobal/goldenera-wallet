@@ -1,0 +1,35 @@
+require_relative '../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios/scripts/pods_helpers'
+
+platform :ios, '15.5'
+use_frameworks!
+
+# workaround to avoid Xcode caching of Pods that requires
+# Product -> Clean Build Folder after new Cordova plugins installed
+# Requires CocoaPods 1.6 or newer
+install! 'cocoapods', :disable_input_output_paths => true
+
+def capacitor_pods
+  pod 'Capacitor', :path => '../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios'
+  pod 'CapacitorMlkitBarcodeScanning', :path => '../../../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor-mlkit/barcode-scanning'
+  pod 'CapacitorApp', :path => '../../../../node_modules/.pnpm/@capacitor+app@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/app'
+  pod 'CapacitorBarcodeScanner', :path => '../../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/barcode-scanner'
+  pod 'CapacitorCamera', :path => '../../../../node_modules/.pnpm/@capacitor+camera@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/camera'
+  pod 'CapacitorPreferences', :path => '../../../../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/preferences'
+  pod 'CapacitorPrivacyScreen', :path => '../../../../node_modules/.pnpm/@capacitor+privacy-screen@2.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/privacy-screen'
+  pod 'CapacitorShare', :path => '../../../../node_modules/.pnpm/@capacitor+share@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/share'
+  pod 'CapacitorSplashScreen', :path => '../../../../node_modules/.pnpm/@capacitor+splash-screen@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/splash-screen'
+  pod 'CapawesomeCapacitorTorch', :path => '../../../../node_modules/.pnpm/@capawesome+capacitor-torch@8.0.0_@capacitor+core@8.0.1/node_modules/@capawesome/capacitor-torch'
+  pod 'CapgoCapacitorNativeBiometric', :path => '../../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.3.1_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-native-biometric'
+  pod 'CapgoCapacitorNavigationBar', :path => '../../../../node_modules/.pnpm/@capgo+capacitor-navigation-bar@8.0.10_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-navigation-bar'
+  pod 'CapacitorSecureStoragePlugin', :path => '../../../../node_modules/.pnpm/capacitor-secure-storage-plugin@0.13.0_@capacitor+core@8.0.1/node_modules/capacitor-secure-storage-plugin'
+end
+
+target 'App' do
+  capacitor_pods
+  # Add your Pods here
+end
+
+post_install do |installer|
+  assertDeploymentTarget(installer)
+end

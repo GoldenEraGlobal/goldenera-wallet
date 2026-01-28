@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - '@parcel/watcher'
+  - '@swc/core'
+  - es5-ext
+  - esbuild
+  - lmdb
+  - msgpackr-extract
+  - msw
+  - protobufjs
+  - sharp

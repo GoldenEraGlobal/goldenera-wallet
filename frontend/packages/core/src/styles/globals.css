@@ -1,0 +1,297 @@
+/*
+ * Stackflow Plugin Basic UI - Theme Overrides
+ * 
+ * These CSS variables override the default Stackflow theme values
+ * to integrate with our shadcn/ui design system.
+ * 
+ * Variables are namespaced as: --stackflow-plugin-basic-ui-{name}
+ * 
+ * Structure:
+ * 1. Base values (shared between themes)
+ * 2. Android theme (light + dark)
+ * 3. Cupertino/iOS theme (light + dark)
+ */
+
+/* ============================================
+   ANDROID THEME - Light Mode
+   ============================================ */
+.theme-android,
+.theme-android [data-part="appBar"] {
+    /* Main backgrounds */
+    --stackflow-plugin-basic-ui-background-color: var(--background) !important;
+    ;
+    --stackflow-plugin-basic-ui-background-image: unset;
+    --stackflow-plugin-basic-ui-dim-background-color: oklch(0 0 0 / 15%) !important;
+    --stackflow-plugin-basic-ui-dim-height: 10rem !important;
+
+    /* Transitions */
+    --stackflow-plugin-basic-ui-transition-duration: 0.35s !important;
+    --stackflow-plugin-basic-ui-computed-transition-duration: 0.35s !important;
+    --stackflow-plugin-basic-ui-default-transition-off-set: 10rem;
+
+    /* App Bar */
+    --stackflow-plugin-basic-ui-app-bar-background-color: var(--background) !important;
+    --stackflow-plugin-basic-ui-app-bar-background-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-image: unset;
+    --stackflow-plugin-basic-ui-app-bar-background-image-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-color: var(--border);
+    --stackflow-plugin-basic-ui-app-bar-border-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-size: 1px;
+    --stackflow-plugin-basic-ui-app-bar-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-height-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-min-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-icon-color: var(--foreground);
+    --stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-text-color: var(--foreground);
+    --stackflow-plugin-basic-ui-app-bar-text-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-overflow: hidden;
+    --stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --stackflow-plugin-basic-ui-app-bar-container-padding: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-item-gap: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-font-size: 1.125rem;
+    --stackflow-plugin-basic-ui-app-bar-line-height: 1.5;
+    --stackflow-plugin-basic-ui-app-bar-hit-slop: 0.5rem;
+
+    /* Bottom Sheet */
+    --stackflow-plugin-basic-ui-bottom-sheet-border-radius: var(--radius-xl);
+
+    /* Modal */
+    --stackflow-plugin-basic-ui-modal-border-radius: var(--radius-xl);
+    --stackflow-plugin-basic-ui-modal-max-width: 100%;
+
+    /* Edge swipe */
+    --stackflow-plugin-basic-ui-edge-width: 1.25rem;
+}
+
+/* ============================================
+   ANDROID THEME - Dark Mode
+   ============================================ */
+.dark .root-ui.theme-android {
+    --stackflow-plugin-basic-ui-dim-background-color: oklch(0 0 0 / 40%);
+}
+
+/* ============================================
+   CUPERTINO/iOS THEME - Light Mode
+   ============================================ */
+.root-ui.theme-cupertino {
+    /* Main backgrounds */
+    --stackflow-plugin-basic-ui-background-color: var(--background) !important;
+    --stackflow-plugin-basic-ui-background-image: unset;
+    --stackflow-plugin-basic-ui-dim-background-color: oklch(0 0 0 / 15%) !important;
+    --stackflow-plugin-basic-ui-dim-height: 100% !important;
+
+    /* Transitions - iOS uses full-width slide */
+    --stackflow-plugin-basic-ui-transition-duration: 0.35s;
+    --stackflow-plugin-basic-ui-computed-transition-duration: 0.35s;
+    --stackflow-plugin-basic-ui-default-transition-off-set: 100%;
+
+    /* App Bar - iOS style (smaller, thinner border) */
+    --stackflow-plugin-basic-ui-app-bar-background-color: var(--background) !important;
+    --stackflow-plugin-basic-ui-app-bar-background-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-image: unset;
+    --stackflow-plugin-basic-ui-app-bar-background-image-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-color: var(--border);
+    --stackflow-plugin-basic-ui-app-bar-border-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-size: 0.5px;
+    --stackflow-plugin-basic-ui-app-bar-height: 2.75rem;
+    --stackflow-plugin-basic-ui-app-bar-height-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-min-height: 2.75rem;
+    --stackflow-plugin-basic-ui-app-bar-icon-color: var(--primary);
+    --stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-text-color: var(--foreground);
+    --stackflow-plugin-basic-ui-app-bar-text-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-overflow: hidden;
+    --stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --stackflow-plugin-basic-ui-app-bar-container-padding: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-item-gap: 0.5rem;
+    --stackflow-plugin-basic-ui-app-bar-font-size: 1.0625rem;
+    --stackflow-plugin-basic-ui-app-bar-line-height: normal;
+    --stackflow-plugin-basic-ui-app-bar-hit-slop: 0.5rem;
+
+    /* Bottom Sheet */
+    --stackflow-plugin-basic-ui-bottom-sheet-border-radius: var(--radius-xl);
+
+    /* Modal */
+    --stackflow-plugin-basic-ui-modal-border-radius: var(--radius-xl);
+    --stackflow-plugin-basic-ui-modal-max-width: 100%;
+
+    /* Edge swipe */
+    --stackflow-plugin-basic-ui-edge-width: 1.25rem;
+}
+
+/* ============================================
+   CUPERTINO/iOS THEME - Dark Mode
+   ============================================ */
+.dark .root-ui.theme-cupertino {
+    --stackflow-plugin-basic-ui-dim-background-color: oklch(0 0 0 / 40%);
+}
+
+/* ============================================
+   SHARED UI COMPONENT OVERRIDES
+   ============================================ */
+
+/* Stackflow root container - ensure full screen coverage */
+.root-ui {
+    height: 100%;
+    max-height: 100%;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* App Bar styling - applies to both themes */
+.root-ui {
+
+    /* App Bar title */
+    [data-part="appBarCenter"] {
+        color: var(--foreground) !important;
+        font-weight: 600;
+    }
+
+    /* App Bar icons/buttons */
+    [data-part="appBarLeft"],
+    [data-part="appBarRight"] {
+        color: var(--foreground);
+    }
+
+    /* Back button - iOS uses primary color */
+    [data-part="backButton"] {
+        color: var(--primary);
+    }
+
+    /* Close button */
+    [data-part="closeButton"] {
+        color: var(--foreground);
+    }
+}
+
+/* iOS-specific App Bar overrides */
+.root-ui.theme-cupertino {
+    [data-part="backButton"] {
+        color: var(--primary);
+    }
+
+    [data-part="appBarCenter"] {
+        font-weight: 600;
+        font-size: 1.0625rem;
+    }
+}
+
+/* Android-specific App Bar overrides */
+.root-ui.theme-android {
+    [data-part="backButton"] {
+        color: var(--foreground);
+    }
+
+    [data-part="appBarCenter"] {
+        font-weight: 500;
+        font-size: 1.125rem;
+    }
+}
+
+/* ============================================
+   BOTTOM SHEET & MODAL OVERRIDES
+   ============================================ */
+.root-ui {
+
+    /* Bottom sheet background */
+    [data-part="bottomSheet"] {
+        background-color: var(--card) !important;
+        color: var(--card-foreground);
+    }
+
+    /* Modal background */
+    [data-part="modal"] {
+        background-color: var(--card) !important;
+        color: var(--card-foreground);
+    }
+
+    /* Dim overlay */
+    [data-part="dim"] {
+        background-color: oklch(0 0 0 / 50%);
+    }
+}
+
+/* Dark mode dim overlay */
+.dark .root-ui {
+    [data-part="dim"] {
+        background-color: oklch(0 0 0 / 70%);
+    }
+}
+
+/* ============================================
+   ACTIVITY/PAGE CONTAINER
+   ============================================ */
+.root-ui {
+
+    /* Activity container - must be constrained to prevent overflow */
+    [data-part="activity"] {
+        background-color: var(--background);
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Main content area - constrained height, scrolling handled by inner containers */
+    [data-part="main"] {
+        background-color: var(--background);
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+        flex: 1;
+        min-height: 0;
+        /* Important for flex children to shrink */
+    }
+
+    /* Paper/stack container */
+    [data-part="paper"] {
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+        flex: 1;
+        min-height: 0;
+    }
+}
+
+html,
+html body,
+html #root,
+html [data-part="paper"] {
+    background: transparent !important;
+}
+
+html.barcode-scanner-active [data-part="dim"] {
+    background-color: transparent !important;
+}
+
+html:has(.is-web) {
+    background-color: var(--background) !important;
+}
+
+/* Layout wrapper height */
+.is-web,
+.is-native {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body,
+html {
+    overflow: hidden !important;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) {
+    *:hover {
+        transition: none !important;
+    }
+}

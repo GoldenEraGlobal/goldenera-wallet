@@ -1,0 +1,577 @@
+._1q6dj2j0 {
+    --stackflow-plugin-basic-ui-background-color: #fff;
+    --stackflow-plugin-basic-ui-background-image: unset;
+    --stackflow-plugin-basic-ui-dim-background-color: #00000026;
+    --stackflow-plugin-basic-ui-dim-height: 10rem;
+    --stackflow-plugin-basic-ui-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-computed-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-default-transition-off-set: 10rem;
+    --stackflow-plugin-basic-ui-app-bar-border-color: #00000012;
+    --stackflow-plugin-basic-ui-app-bar-border-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-size: 1px;
+    --stackflow-plugin-basic-ui-app-bar-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-height-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-min-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-icon-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-text-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-text-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-color: #fff;
+    --stackflow-plugin-basic-ui-app-bar-background-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-image: unset;
+    --stackflow-plugin-basic-ui-app-bar-background-image-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-overflow: hidden;
+    --stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top: 0px;
+    --stackflow-plugin-basic-ui-app-bar-container-padding: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-item-gap: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-font-size: 1.125rem;
+    --stackflow-plugin-basic-ui-app-bar-hit-slop: .5rem;
+    --stackflow-plugin-basic-ui-app-bar-line-height: 1.5;
+    --stackflow-plugin-basic-ui-bottom-sheet-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-max-width: 100%;
+    --stackflow-plugin-basic-ui-edge-width: 1.25rem
+}
+
+._1q6dj2j1,
+:root[data-stackflow-plugin-basic-ui-theme=cupertino] {
+    --stackflow-plugin-basic-ui-background-color: #fff;
+    --stackflow-plugin-basic-ui-background-image: unset;
+    --stackflow-plugin-basic-ui-dim-background-color: #00000026;
+    --stackflow-plugin-basic-ui-dim-height: 100%;
+    --stackflow-plugin-basic-ui-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-computed-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-default-transition-off-set: 100%;
+    --stackflow-plugin-basic-ui-app-bar-border-color: #00000012;
+    --stackflow-plugin-basic-ui-app-bar-border-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-size: .5px;
+    --stackflow-plugin-basic-ui-app-bar-height: 2.75rem;
+    --stackflow-plugin-basic-ui-app-bar-height-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-min-height: 2.75rem;
+    --stackflow-plugin-basic-ui-app-bar-icon-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-text-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-text-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-color: #fff;
+    --stackflow-plugin-basic-ui-app-bar-background-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-image: unset;
+    --stackflow-plugin-basic-ui-app-bar-background-image-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-overflow: hidden;
+    --stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top: 0px;
+    --stackflow-plugin-basic-ui-app-bar-container-padding: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-item-gap: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-font-size: 1.125rem;
+    --stackflow-plugin-basic-ui-app-bar-hit-slop: .5rem;
+    --stackflow-plugin-basic-ui-app-bar-line-height: normal;
+    --stackflow-plugin-basic-ui-bottom-sheet-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-max-width: 100%;
+    --stackflow-plugin-basic-ui-edge-width: 1.25rem
+}
+
+:root[data-stackflow-plugin-basic-ui-theme=android] {
+    --stackflow-plugin-basic-ui-background-color: #fff;
+    --stackflow-plugin-basic-ui-background-image: unset;
+    --stackflow-plugin-basic-ui-dim-background-color: #00000026;
+    --stackflow-plugin-basic-ui-dim-height: 10rem;
+    --stackflow-plugin-basic-ui-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-computed-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-default-transition-off-set: 10rem;
+    --stackflow-plugin-basic-ui-app-bar-border-color: #00000012;
+    --stackflow-plugin-basic-ui-app-bar-border-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-border-size: 1px;
+    --stackflow-plugin-basic-ui-app-bar-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-height-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-min-height: 3.5rem;
+    --stackflow-plugin-basic-ui-app-bar-icon-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-text-color: #212124;
+    --stackflow-plugin-basic-ui-app-bar-text-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-color: #fff;
+    --stackflow-plugin-basic-ui-app-bar-background-color-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-background-image: unset;
+    --stackflow-plugin-basic-ui-app-bar-background-image-transition-duration: 0s;
+    --stackflow-plugin-basic-ui-app-bar-overflow: hidden;
+    --stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top: 0px;
+    --stackflow-plugin-basic-ui-app-bar-container-padding: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-item-gap: 1rem;
+    --stackflow-plugin-basic-ui-app-bar-font-size: 1.125rem;
+    --stackflow-plugin-basic-ui-app-bar-hit-slop: .5rem;
+    --stackflow-plugin-basic-ui-app-bar-line-height: 1.5;
+    --stackflow-plugin-basic-ui-bottom-sheet-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-border-radius: 1rem;
+    --stackflow-plugin-basic-ui-modal-max-width: 100%;
+    --stackflow-plugin-basic-ui-edge-width: 1.25rem
+}
+
+.dhthxq0 {
+    width: 100%
+}
+
+.dhthxq1 {
+    height: 100%
+}
+
+.dhthxq2 {
+    top: 0
+}
+
+.dhthxq3 {
+    left: 0
+}
+
+.dhthxq4 {
+    position: absolute
+}
+
+.dhthxq5 {
+    position: relative
+}
+
+.dhthxq7 {
+    display: flex
+}
+
+.dhthxq8 {
+    flex: 1
+}
+
+.dhthxq9 {
+    align-items: center
+}
+
+.dhthxqa {
+    align-items: flex-end
+}
+
+.dhthxqb {
+    justify-content: center
+}
+
+.dhthxqc {
+    overflow: hidden
+}
+
+.dhthxqd {
+    white-space: nowrap
+}
+
+.dhthxqe {
+    text-align: center
+}
+
+.dhthxqf {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent
+}
+
+.dhthxqg {
+    box-sizing: border-box
+}
+
+.dhthxqh {
+    box-sizing: content-box
+}
+
+.dhthxqi {
+    appearance: none;
+    background: 0 0;
+    border: 0;
+    padding: 0
+}
+
+._1dlf4347 {
+    background-color: var(--stackflow-plugin-basic-ui-dim-background-color)
+}
+
+._1dlf4348 {
+    background-color: var(--stackflow-plugin-basic-ui-background-color);
+    background-image: var(--stackflow-plugin-basic-ui-background-image)
+}
+
+._1dlf4349 {
+    transition: transform var(--_1dlf4340), opacity var(--_1dlf4340)
+}
+
+._1dlf434d {
+    transform: translate(100%)
+}
+
+._1dlf434j {
+    --_1dlf4345: var(--stackflow-plugin-basic-ui-app-bar-height)
+}
+
+._1dlf434k {
+    opacity: 0;
+    z-index: var(--_1dlf4341);
+    height: var(--stackflow-plugin-basic-ui-dim-height)
+}
+
+._1q6dj2j0 ._1dlf434k {
+    background: linear-gradient(var(--stackflow-plugin-basic-ui-dim-background-color), #0000)
+}
+
+._1dlf434a ._1dlf434k,
+._1dlf434b ._1dlf434k {
+    opacity: 1
+}
+
+._1dlf434c ._1dlf434k,
+._1dlf434d ._1dlf434k {
+    opacity: 0
+}
+
+._1dlf434l {
+    z-index: var(--_1dlf4342)
+}
+
+._1q6dj2j1 ._1dlf434l {
+    transform: translate3d(var(--stackflow-plugin-basic-ui-default-transition-off-set), 0, 0)
+}
+
+._1q6dj2j1 ._1dlf434a ._1dlf434l,
+._1q6dj2j1 ._1dlf434b ._1dlf434l {
+    transform: translate(0, 0)
+}
+
+._1q6dj2j0 ._1dlf434l {
+    opacity: 0;
+    transform: translate3d(0, var(--stackflow-plugin-basic-ui-default-transition-off-set), 0)
+}
+
+._1q6dj2j0 ._1dlf434a ._1dlf434l,
+._1q6dj2j0 ._1dlf434b ._1dlf434l {
+    opacity: 1;
+    transform: translate(0, 0)
+}
+
+._1dlf434m {
+    transition: transform var(--_1dlf4340), opacity var(--_1dlf4340), margin-top var(--stackflow-plugin-basic-ui-app-bar-height-transition-duration);
+    padding-top: var(--_1dlf4345)
+}
+
+._1q6dj2j1 ._1dlf434n {
+    transform: translateY(100%)
+}
+
+._1q6dj2j0 ._1dlf434o {
+    transform: translate(50%)
+}
+
+._1dlf434p {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: scroll
+}
+
+._1dlf434p::-webkit-scrollbar {
+    display: none
+}
+
+._1dlf434q {
+    margin-top: var(--_1dlf4345);
+    height: calc(100% - var(--_1dlf4345))
+}
+
+._1dlf434r {
+    width: var(--stackflow-plugin-basic-ui-edge-width);
+    z-index: var(--_1dlf4343)
+}
+
+._1dlf434s {
+    top: var(--_1dlf4345);
+    height: calc(100% - var(--_1dlf4345))
+}
+
+@supports (padding:max(0px)) and (padding:constant(safe-area-inset-top)) {
+    ._1dlf434j {
+        --_1dlf4345: calc(var(--stackflow-plugin-basic-ui-app-bar-height) + max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), constant(safe-area-inset-top)))
+    }
+}
+
+@supports (padding:max(0px)) and (padding:env(safe-area-inset-top)) {
+    ._1dlf434j {
+        --_1dlf4345: calc(var(--stackflow-plugin-basic-ui-app-bar-height) + max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), env(safe-area-inset-top)))
+    }
+}
+
+._1yk3a450 {
+    min-height: var(--stackflow-plugin-basic-ui-app-bar-min-height)
+}
+
+._1yk3a451 {
+    overflow: var(--stackflow-plugin-basic-ui-app-bar-overflow)
+}
+
+._1yk3a452 {
+    background-color: var(--stackflow-plugin-basic-ui-app-bar-background-color);
+    background-image: var(--stackflow-plugin-basic-ui-app-bar-background-image);
+    z-index: var(--_1dlf4344);
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration)
+}
+
+._1q6dj2j1 ._1yk3a452 {
+    position: absolute
+}
+
+._1q6dj2j1 ._1dlf434c ._1yk3a452 {
+    transform: translate3d(var(--stackflow-plugin-basic-ui-default-transition-off-set), 0, 0);
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform 0s
+}
+
+._1q6dj2j0 ._1yk3a452 {
+    opacity: 0;
+    transform: translate3d(0, var(--stackflow-plugin-basic-ui-default-transition-off-set), 0);
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340), opacity var(--_1dlf4340)
+}
+
+._1q6dj2j0 ._1dlf434a ._1yk3a452,
+._1q6dj2j0 ._1dlf434b ._1yk3a452,
+._1q6dj2j0 ._1yk3a453 {
+    opacity: 1;
+    transform: translate(0, 0)
+}
+
+._1q6dj2j0 ._1dlf434c ._1yk3a453 {
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform 0s;
+    transform: translate(100%)
+}
+
+._1q6dj2j1 ._1yk3a454 {
+    transform: translate(100%)
+}
+
+._1q6dj2j1 ._1dlf434c ._1yk3a454 {
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340)
+}
+
+._1q6dj2j1 ._1dlf434a ._1yk3a454,
+._1q6dj2j1 ._1dlf434b ._1yk3a454 {
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340);
+    transform: translate(0, 0)
+}
+
+._1yk3a455 {
+    box-shadow: inset 0px calc(-1*var(--stackflow-plugin-basic-ui-app-bar-border-size))0 var(--stackflow-plugin-basic-ui-app-bar-border-color)
+}
+
+._1q6dj2j1 ._1yk3a456 {
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340), opacity var(--_1dlf4340);
+    transform: translateY(100vh)
+}
+
+._1q6dj2j1 ._1dlf434a ._1yk3a456,
+._1q6dj2j1 ._1dlf434b ._1yk3a456 {
+    transform: translate(0, 0)
+}
+
+._1q6dj2j1 ._1dlf434c ._1yk3a456 {
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340), opacity var(--_1dlf4340);
+    transform: translateY(100vh)
+}
+
+._1q6dj2j0 ._1yk3a457,
+._1q6dj2j0 ._1dlf434c ._1yk3a457,
+._1q6dj2j0 ._1dlf434d ._1yk3a457 {
+    opacity: 0;
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340), opacity var(--_1dlf4340);
+    transform: translate(50%)
+}
+
+._1q6dj2j0 ._1dlf434a ._1yk3a457,
+._1q6dj2j0 ._1dlf434b ._1yk3a457 {
+    opacity: 1;
+    transition: background-color var(--stackflow-plugin-basic-ui-app-bar-background-color-transition-duration), background-image var(--stackflow-plugin-basic-ui-app-bar-background-image-transition-duration), box-shadow var(--stackflow-plugin-basic-ui-app-bar-border-color-transition-duration), transform var(--_1dlf4340), opacity var(--_1dlf4340);
+    transform: translate(0, 0)
+}
+
+._1yk3a458 {
+    height: max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), constant(safe-area-inset-top));
+    height: max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), env(safe-area-inset-top))
+}
+
+._1yk3a459 {
+    height: var(--stackflow-plugin-basic-ui-app-bar-height);
+    transition: height var(--stackflow-plugin-basic-ui-app-bar-height-transition-duration)
+}
+
+._1q6dj2j0 ._1yk3a459 {
+    padding-left: var(--stackflow-plugin-basic-ui-app-bar-container-padding);
+    padding-right: var(--stackflow-plugin-basic-ui-app-bar-container-padding)
+}
+
+._1yk3a45a {
+    padding-right: var(--stackflow-plugin-basic-ui-app-bar-item-gap)
+}
+
+._1yk3a45a:empty {
+    display: none
+}
+
+._1q6dj2j1 ._1yk3a45a {
+    padding-left: var(--stackflow-plugin-basic-ui-app-bar-container-padding)
+}
+
+._1yk3a45b {
+    color: var(--stackflow-plugin-basic-ui-app-bar-icon-color);
+    transition: opacity .3s, color var(--stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration);
+    padding: var(--stackflow-plugin-basic-ui-app-bar-hit-slop);
+    margin: calc(-1*var(--stackflow-plugin-basic-ui-app-bar-hit-slop))
+}
+
+._1yk3a45b:active {
+    opacity: .2;
+    transition: opacity 0s, color var(--stackflow-plugin-basic-ui-app-bar-icon-color-transition-duration)
+}
+
+._1yk3a45e {
+    color: var(--stackflow-plugin-basic-ui-app-bar-text-color);
+    font-size: var(--stackflow-plugin-basic-ui-app-bar-font-size);
+    line-height: var(--stackflow-plugin-basic-ui-app-bar-line-height);
+    transition: height var(--stackflow-plugin-basic-ui-app-bar-height-transition-duration), color var(--stackflow-plugin-basic-ui-app-bar-text-color-transition-duration);
+    font-weight: 700;
+    display: flex
+}
+
+._1q6dj2j0 ._1yk3a45e {
+    box-sizing: border-box;
+    justify-content: flex-start;
+    width: 100%
+}
+
+._1q6dj2j1 ._1yk3a45e {
+    width: var(--_1dlf4346);
+    text-align: center;
+    height: var(--stackflow-plugin-basic-ui-app-bar-height);
+    left: 50%;
+    top: max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), constant(safe-area-inset-top));
+    top: max(var(--stackflow-plugin-basic-ui-app-bar-min-safe-area-inset-top), env(safe-area-inset-top));
+    justify-content: center;
+    align-items: center;
+    font-family: -apple-system, BlinkMacSystemFont;
+    position: absolute;
+    transform: translate(-50%)
+}
+
+._1yk3a45f {
+    height: var(--stackflow-plugin-basic-ui-app-bar-font-size);
+    max-width: calc(var(--stackflow-plugin-basic-ui-app-bar-font-size)*5);
+    width: var(--_1dlf4346);
+    display: none;
+    left: 50%;
+    transform: translate(-50%)
+}
+
+._1q6dj2j1 ._1yk3a45f {
+    display: block
+}
+
+._1yk3a45g {
+    text-overflow: ellipsis;
+    font-size: inherit;
+    font-weight: inherit
+}
+
+._1yk3a45h {
+    padding-left: var(--stackflow-plugin-basic-ui-app-bar-item-gap)
+}
+
+._1yk3a45h:empty {
+    display: none
+}
+
+._1q6dj2j1 ._1yk3a45h {
+    padding-right: var(--stackflow-plugin-basic-ui-app-bar-container-padding)
+}
+
+._1ht38h03 {
+    transition: var(--_1ht38h00)
+}
+
+._1ht38h07 {
+    transform: translate(100%)
+}
+
+._1ht38h0d {
+    background-color: var(--stackflow-plugin-basic-ui-dim-background-color);
+    z-index: var(--_1ht38h01);
+    opacity: 0
+}
+
+._1ht38h04 ._1ht38h0d,
+._1ht38h05 ._1ht38h0d {
+    opacity: 1
+}
+
+._1ht38h06 ._1ht38h0d,
+._1ht38h07 ._1ht38h0d {
+    opacity: 0
+}
+
+._1ht38h0e {
+    background-color: var(--stackflow-plugin-basic-ui-background-color);
+    background-image: var(--stackflow-plugin-basic-ui-background-image);
+    border-radius: var(--stackflow-plugin-basic-ui-bottom-sheet-border-radius)var(--stackflow-plugin-basic-ui-bottom-sheet-border-radius)0 0;
+    opacity: 0;
+    width: 100%;
+    transform: translateY(100%)
+}
+
+._1ht38h04 ._1ht38h0e,
+._1ht38h05 ._1ht38h0e {
+    opacity: 1;
+    transform: translate(0, 0)
+}
+
+._1ht38h06 ._1ht38h0e,
+._1ht38h07 ._1ht38h0e {
+    opacity: 0 !important;
+    transform: translateY(100%) !important
+}
+
+._5ozg8c3 {
+    transition: var(--_5ozg8c0)
+}
+
+._5ozg8c7 {
+    transform: translate(100%)
+}
+
+._5ozg8cd {
+    background-color: var(--stackflow-plugin-basic-ui-dim-background-color);
+    z-index: var(--_5ozg8c1);
+    opacity: 0
+}
+
+._5ozg8c4 ._5ozg8cd,
+._5ozg8c5 ._5ozg8cd {
+    opacity: 1
+}
+
+._5ozg8c6 ._5ozg8cd,
+._5ozg8c7 ._5ozg8cd {
+    opacity: 0
+}
+
+._5ozg8ce {
+    background-color: var(--stackflow-plugin-basic-ui-background-color);
+    background-image: var(--stackflow-plugin-basic-ui-background-image);
+    width: 100%;
+    max-width: var(--stackflow-plugin-basic-ui-modal-max-width);
+    border-radius: var(--stackflow-plugin-basic-ui-modal-border-radius);
+    opacity: 0;
+    margin: 0 2.5rem;
+    transform: scale(1.1);
+    box-shadow: 0 .625rem 2.375rem #00000026, 0 .5625rem 2.875rem #0000001f, 0 .3125rem .9375rem #0000001a
+}
+
+._5ozg8c4 ._5ozg8ce,
+._5ozg8c5 ._5ozg8ce {
+    opacity: 1;
+    transform: scale(1)
+}
+
+._5ozg8c6 ._5ozg8ce,
+._5ozg8c7 ._5ozg8ce {
+    opacity: 0;
+    transform: scale(1.1)
+}

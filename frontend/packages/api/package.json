@@ -1,0 +1,51 @@
+{
+  "name": "@project/api",
+  "version": "1.0.0",
+  "description": "GoldenEra Wallet API",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    },
+    "./client": {
+      "import": "./src/client.ts",
+      "types": "./src/client.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "generate": "kubb generate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.2",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@tanstack/react-query": "^5.90"
+  },
+  "dependencies": {
+    "axios": "^1.13.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@kubb/cli": "^4.19.2",
+    "@kubb/core": "^4.19.2",
+    "@kubb/plugin-oas": "^4.19.2",
+    "@kubb/plugin-react-query": "^4.19.2",
+    "@kubb/plugin-ts": "^4.19.2",
+    "@tanstack/react-query": "^5.90.20",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}

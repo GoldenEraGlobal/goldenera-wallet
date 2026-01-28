@@ -1,0 +1,174 @@
+PODS:
+  - Capacitor (8.0.1):
+    - CapacitorCordova
+  - CapacitorApp (8.0.0):
+    - Capacitor
+  - CapacitorBarcodeScanner (3.0.0):
+    - Capacitor
+    - OSBarcodeLib (= 2.0.1)
+  - CapacitorCamera (8.0.0):
+    - Capacitor
+  - CapacitorCordova (8.0.1)
+  - CapacitorMlkitBarcodeScanning (8.0.0):
+    - Capacitor
+    - GoogleMLKit/BarcodeScanning (~> 8.0.0)
+  - CapacitorPreferences (8.0.0):
+    - Capacitor
+  - CapacitorPrivacyScreen (2.0.0):
+    - Capacitor
+  - CapacitorSecureStoragePlugin (0.13.0):
+    - Capacitor
+    - SwiftKeychainWrapper
+  - CapacitorShare (8.0.0):
+    - Capacitor
+  - CapacitorSplashScreen (8.0.0):
+    - Capacitor
+  - CapawesomeCapacitorTorch (8.0.0):
+    - Capacitor
+  - CapgoCapacitorNativeBiometric (7.1.13):
+    - Capacitor
+  - CapgoCapacitorNavigationBar (8.0.10):
+    - Capacitor
+  - GoogleDataTransport (10.1.0):
+    - nanopb (~> 3.30910.0)
+    - PromisesObjC (~> 2.4)
+  - GoogleMLKit/BarcodeScanning (8.0.0):
+    - GoogleMLKit/MLKitCore
+    - MLKitBarcodeScanning (~> 7.0.0)
+  - GoogleMLKit/MLKitCore (8.0.0):
+    - MLKitCommon (~> 13.0.0)
+  - GoogleToolboxForMac/Defines (4.2.1)
+  - GoogleToolboxForMac/Logger (4.2.1):
+    - GoogleToolboxForMac/Defines (= 4.2.1)
+  - "GoogleToolboxForMac/NSData+zlib (4.2.1)":
+    - GoogleToolboxForMac/Defines (= 4.2.1)
+  - GoogleUtilities/Environment (8.1.0):
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Logger (8.1.0):
+    - GoogleUtilities/Environment
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/Privacy (8.1.0)
+  - GoogleUtilities/UserDefaults (8.1.0):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
+  - GTMSessionFetcher/Core (3.5.0)
+  - MLImage (1.0.0-beta7)
+  - MLKitBarcodeScanning (7.0.0):
+    - MLKitCommon (~> 13.0)
+    - MLKitVision (~> 9.0)
+  - MLKitCommon (13.0.0):
+    - GoogleDataTransport (~> 10.0)
+    - GoogleToolboxForMac/Logger (< 5.0, >= 4.2.1)
+    - "GoogleToolboxForMac/NSData+zlib (< 5.0, >= 4.2.1)"
+    - GoogleUtilities/Logger (~> 8.0)
+    - GoogleUtilities/UserDefaults (~> 8.0)
+    - GTMSessionFetcher/Core (< 4.0, >= 3.3.2)
+  - MLKitVision (9.0.0):
+    - GoogleToolboxForMac/Logger (< 5.0, >= 4.2.1)
+    - "GoogleToolboxForMac/NSData+zlib (< 5.0, >= 4.2.1)"
+    - GTMSessionFetcher/Core (< 4.0, >= 3.3.2)
+    - MLImage (= 1.0.0-beta7)
+    - MLKitCommon (~> 13.0)
+  - nanopb (3.30910.0):
+    - nanopb/decode (= 3.30910.0)
+    - nanopb/encode (= 3.30910.0)
+  - nanopb/decode (3.30910.0)
+  - nanopb/encode (3.30910.0)
+  - OSBarcodeLib (2.0.1)
+  - PromisesObjC (2.4.0)
+  - SwiftKeychainWrapper (4.0.1)
+
+DEPENDENCIES:
+  - "Capacitor (from `../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios`)"
+  - "CapacitorApp (from `../../../../node_modules/.pnpm/@capacitor+app@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/app`)"
+  - "CapacitorBarcodeScanner (from `../../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/barcode-scanner`)"
+  - "CapacitorCamera (from `../../../../node_modules/.pnpm/@capacitor+camera@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/camera`)"
+  - "CapacitorCordova (from `../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios`)"
+  - "CapacitorMlkitBarcodeScanning (from `../../../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor-mlkit/barcode-scanning`)"
+  - "CapacitorPreferences (from `../../../../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/preferences`)"
+  - "CapacitorPrivacyScreen (from `../../../../node_modules/.pnpm/@capacitor+privacy-screen@2.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/privacy-screen`)"
+  - "CapacitorSecureStoragePlugin (from `../../../../node_modules/.pnpm/capacitor-secure-storage-plugin@0.13.0_@capacitor+core@8.0.1/node_modules/capacitor-secure-storage-plugin`)"
+  - "CapacitorShare (from `../../../../node_modules/.pnpm/@capacitor+share@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/share`)"
+  - "CapacitorSplashScreen (from `../../../../node_modules/.pnpm/@capacitor+splash-screen@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/splash-screen`)"
+  - "CapawesomeCapacitorTorch (from `../../../../node_modules/.pnpm/@capawesome+capacitor-torch@8.0.0_@capacitor+core@8.0.1/node_modules/@capawesome/capacitor-torch`)"
+  - "CapgoCapacitorNativeBiometric (from `../../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.3.1_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-native-biometric`)"
+  - "CapgoCapacitorNavigationBar (from `../../../../node_modules/.pnpm/@capgo+capacitor-navigation-bar@8.0.10_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-navigation-bar`)"
+
+SPEC REPOS:
+  trunk:
+    - GoogleDataTransport
+    - GoogleMLKit
+    - GoogleToolboxForMac
+    - GoogleUtilities
+    - GTMSessionFetcher
+    - MLImage
+    - MLKitBarcodeScanning
+    - MLKitCommon
+    - MLKitVision
+    - nanopb
+    - OSBarcodeLib
+    - PromisesObjC
+    - SwiftKeychainWrapper
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios"
+  CapacitorApp:
+    :path: "../../../../node_modules/.pnpm/@capacitor+app@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/app"
+  CapacitorBarcodeScanner:
+    :path: "../../../../node_modules/.pnpm/@capacitor+barcode-scanner@3.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/barcode-scanner"
+  CapacitorCamera:
+    :path: "../../../../node_modules/.pnpm/@capacitor+camera@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/camera"
+  CapacitorCordova:
+    :path: "../../../../node_modules/.pnpm/@capacitor+ios@8.0.1_@capacitor+core@8.0.1/node_modules/@capacitor/ios"
+  CapacitorMlkitBarcodeScanning:
+    :path: "../../../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor-mlkit/barcode-scanning"
+  CapacitorPreferences:
+    :path: "../../../../node_modules/.pnpm/@capacitor+preferences@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/preferences"
+  CapacitorPrivacyScreen:
+    :path: "../../../../node_modules/.pnpm/@capacitor+privacy-screen@2.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/privacy-screen"
+  CapacitorSecureStoragePlugin:
+    :path: "../../../../node_modules/.pnpm/capacitor-secure-storage-plugin@0.13.0_@capacitor+core@8.0.1/node_modules/capacitor-secure-storage-plugin"
+  CapacitorShare:
+    :path: "../../../../node_modules/.pnpm/@capacitor+share@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/share"
+  CapacitorSplashScreen:
+    :path: "../../../../node_modules/.pnpm/@capacitor+splash-screen@8.0.0_@capacitor+core@8.0.1/node_modules/@capacitor/splash-screen"
+  CapawesomeCapacitorTorch:
+    :path: "../../../../node_modules/.pnpm/@capawesome+capacitor-torch@8.0.0_@capacitor+core@8.0.1/node_modules/@capawesome/capacitor-torch"
+  CapgoCapacitorNativeBiometric:
+    :path: "../../../../node_modules/.pnpm/@capgo+capacitor-native-biometric@8.3.1_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-native-biometric"
+  CapgoCapacitorNavigationBar:
+    :path: "../../../../node_modules/.pnpm/@capgo+capacitor-navigation-bar@8.0.10_@capacitor+core@8.0.1/node_modules/@capgo/capacitor-navigation-bar"
+
+SPEC CHECKSUMS:
+  Capacitor: ff35b0f66370b84aa238251b35b91886a3207c16
+  CapacitorApp: 3963a84197280757b84f126afd1520a85ae3b092
+  CapacitorBarcodeScanner: b56bf5972818c8ef6f7ca27e877dbfd7d1345ef0
+  CapacitorCamera: 592acb7ab9fb748e2d8571eb03af30ec4e1ace12
+  CapacitorCordova: 0d65b9bb74e995dcecb9463f34f1af2aba6f955c
+  CapacitorMlkitBarcodeScanning: c990cd038eeede95212af747f0e7fcf9c91e61e7
+  CapacitorPreferences: 443fabe9670226200e595658a87ef0b1566716d4
+  CapacitorPrivacyScreen: 43843345f4d4be827664c78bb6693bef5ab1a229
+  CapacitorSecureStoragePlugin: d083ff28d9ba5bc74924b9bcf9754ea605016b63
+  CapacitorShare: 12f1d192170cbcf9f108fd675ac8e343761a4638
+  CapacitorSplashScreen: 422880d7117605c30699eb4b21644b62db42e86c
+  CapawesomeCapacitorTorch: 7d45a2863fd0c13ed7d754549f99212fea4c7076
+  CapgoCapacitorNativeBiometric: c9a116d9516b3f52dd335aea6a0c5073be36fe5a
+  CapgoCapacitorNavigationBar: 12eb244a01dd8091b2674778beb64be58241a9f6
+  GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
+  GoogleMLKit: ddd51d7dff36ff28defa69afedd9cdce684fd857
+  GoogleToolboxForMac: d1a2cbf009c453f4d6ded37c105e2f67a32206d8
+  GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
+  GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  MLImage: 2ab9c968e75f57911c16f4c9d9e8a8e9604a86a1
+  MLKitBarcodeScanning: 72c6437f13a900833b400136be53a8a5d86f42fa
+  MLKitCommon: 26b779f072a182c1603d4c88a101c350cac837b1
+  MLKitVision: fa8dea9012ac59497c79ddbe9ebf32051047ac4c
+  nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  OSBarcodeLib: 57987d2eb1f916f701f4554e20e349b3cb83f023
+  PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
+  SwiftKeychainWrapper: 807ba1d63c33a7d0613288512399cd1eda1e470c
+
+PODFILE CHECKSUM: 5d88cd6b87f623c9f3836458efd066fb98341685
+
+COCOAPODS: 1.16.2

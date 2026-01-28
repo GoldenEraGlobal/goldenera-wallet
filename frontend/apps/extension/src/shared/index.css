@@ -1,0 +1,22 @@
+/* Extension entry point CSS */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+/* Scan workspace packages for Tailwind classes */
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../../packages/core/src/**/*.{ts,tsx}";
+
+/* Import shared theme and global styles from @project/ui */
+@import "../../../../packages/ui/src/styles/theme.css";
+@import "../../../../packages/ui/src/styles/globals.css";
+@import "../../../../packages/core/src/styles/globals.css";
+
+/* Extension-specific overrides */
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}

@@ -1,0 +1,1 @@
+import{d as e}from"./vendor-capacitor-BX7UtLP6.js";export{e as PreferencesWeb};

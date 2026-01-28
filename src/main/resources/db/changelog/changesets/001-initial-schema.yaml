@@ -1,0 +1,517 @@
+databaseChangeLog:
+- changeSet:
+    id: 1765401902526-1
+    author: goldenera (generated)
+    changes:
+    - createSequence:
+        incrementBy: 50
+        sequenceName: bip_state_id_seq
+        startValue: 1
+- changeSet:
+    id: 1765401902526-2
+    author: goldenera (generated)
+    changes:
+    - createSequence:
+        incrementBy: 100
+        sequenceName: block_id_seq
+        startValue: 1
+- changeSet:
+    id: 1765401902526-3
+    author: goldenera (generated)
+    changes:
+    - createSequence:
+        incrementBy: 50
+        sequenceName: tracked_addr_id_seq
+        startValue: 1
+- changeSet:
+    id: 1765401902526-4
+    author: goldenera (generated)
+    changes:
+    - createSequence:
+        incrementBy: 1000
+        sequenceName: transfer_seq
+        startValue: 1
+- changeSet:
+    id: 1765401902526-5
+    author: goldenera (generated)
+    changes:
+    - createSequence:
+        incrementBy: 50
+        sequenceName: user_acc_id_seq
+        startValue: 1
+- changeSet:
+    id: 1765401902526-6
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: bip_statePK
+            name: id
+            type: BIGINT
+        - column:
+            name: approvers
+            type: JSONB
+        - column:
+            constraints:
+              nullable: false
+            name: created_at_timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: disapprovers
+            type: JSONB
+        - column:
+            name: executed_at_timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: expiration_timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: hash
+            type: BYTEA
+        - column:
+            constraints:
+              nullable: false
+            name: is_action_executed
+            type: BOOLEAN
+        - column:
+            name: meta_derived_token_address
+            type: BYTEA
+        - column:
+            name: payload
+            type: JSONB
+        - column:
+            constraints:
+              nullable: false
+            name: number_of_required_votes
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(32)
+        - column:
+            constraints:
+              nullable: false
+            name: type
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: updated_at_block_height
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: updated_at_timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: updated_by_tx_hash
+            type: BYTEA
+        - column:
+            constraints:
+              nullable: false
+            name: block_id
+            type: BIGINT
+        tableName: bip_state
+- changeSet:
+    id: 1765401902526-7
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: blockPK
+            name: id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: hash
+            type: BYTEA
+        - column:
+            constraints:
+              nullable: false
+            name: height
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: parent_hash
+            type: BYTEA
+        - column:
+            constraints:
+              nullable: false
+            name: timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        tableName: block
+- changeSet:
+    id: 1765401902526-8
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: devicePK
+            name: id
+            type: UUID
+        - column:
+            name: app_version
+            type: VARCHAR(20)
+        - column:
+            constraints:
+              nullable: false
+            name: client_identifier
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: created_at
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: fcm_token
+            type: VARCHAR(512)
+        - column:
+            name: last_seen_at
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: platform
+            type: VARCHAR(20)
+        tableName: device
+- changeSet:
+    id: 1765401902526-9
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: tracked_addressPK
+            name: id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: address
+            type: BYTEA
+        tableName: tracked_address
+- changeSet:
+    id: 1765401902526-10
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: transferPK
+            name: id
+            type: BIGINT
+        - column:
+            name: amount
+            type: numeric
+        - column:
+            name: block_height
+            type: BIGINT
+        - column:
+            name: fee
+            type: numeric
+        - column:
+            name: from_address
+            type: BYTEA
+        - column:
+            name: message
+            type: BYTEA
+        - column:
+            name: nonce
+            type: BIGINT
+        - column:
+            name: original_type
+            type: VARCHAR(255)
+        - column:
+            name: payload
+            type: JSONB
+        - column:
+            name: reference_hash
+            type: BYTEA
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(32)
+        - column:
+            constraints:
+              nullable: false
+            name: timestamp
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: to_address
+            type: BYTEA
+        - column:
+            name: token_address
+            type: BYTEA
+        - column:
+            name: tx_hash
+            type: BYTEA
+        - column:
+            name: tx_index
+            type: INT
+        - column:
+            constraints:
+              nullable: false
+            name: type
+            type: VARCHAR(255)
+        - column:
+            name: block_id
+            type: BIGINT
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-11
+    author: goldenera (generated)
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: user_accountPK
+            name: id
+            type: BIGINT
+        - column:
+            constraints:
+              nullable: false
+            name: created_at
+            type: TIMESTAMP(6) WITH TIME ZONE
+        - column:
+            name: label
+            type: VARCHAR(64)
+        - column:
+            constraints:
+              nullable: false
+            name: device_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: tracked_address_id
+            type: BIGINT
+        tableName: user_account
+- changeSet:
+    id: 1765401902526-12
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: id
+        constraintName: UC_BLOCKID_COL
+        tableName: block
+- changeSet:
+    id: 1765401902526-13
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: tx_hash
+        constraintName: UC_TRANSFERTX_HASH_COL
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-14
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: hash
+        constraintName: idx_block_hash
+        tableName: block
+- changeSet:
+    id: 1765401902526-15
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: client_identifier
+        constraintName: idx_device_client_id
+        tableName: device
+- changeSet:
+    id: 1765401902526-16
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: address
+        constraintName: idx_tracked_addr_hash
+        tableName: tracked_address
+- changeSet:
+    id: 1765401902526-17
+    author: goldenera (generated)
+    changes:
+    - addUniqueConstraint:
+        columnNames: device_id, tracked_address_id
+        constraintName: uk_device_tracked_addr
+        tableName: user_account
+- changeSet:
+    id: 1765401902526-18
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: hash
+        - column:
+            name: block_id
+        indexName: idx_bip_state_hash_latest
+        tableName: bip_state
+- changeSet:
+    id: 1765401902526-19
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: status
+        indexName: idx_bip_state_status
+        tableName: bip_state
+- changeSet:
+    id: 1765401902526-20
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: updated_at_block_height
+        indexName: idx_bip_state_updated_height
+        tableName: bip_state
+- changeSet:
+    id: 1765401902526-21
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: height
+        indexName: idx_block_height
+        tableName: block
+- changeSet:
+    id: 1765401902526-22
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: fcm_token
+        indexName: idx_device_fcm_token
+        tableName: device
+- changeSet:
+    id: 1765401902526-23
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: from_address
+        - column:
+            descending: true
+            name: block_height
+        indexName: idx_transfer_from
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-24
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: reference_hash
+        indexName: idx_transfer_reference_hash
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-25
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: to_address
+        - column:
+            descending: true
+            name: block_height
+        indexName: idx_transfer_to
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-26
+    author: goldenera (generated)
+    changes:
+    - createIndex:
+        columns:
+        - column:
+            name: token_address
+        - column:
+            descending: true
+            name: block_height
+        indexName: idx_transfer_token
+        tableName: transfer
+- changeSet:
+    id: 1765401902526-27
+    author: goldenera (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: block_id
+        baseTableName: bip_state
+        constraintName: fk_bip_state_block
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: block
+        validate: true
+- changeSet:
+    id: 1765401902526-28
+    author: goldenera (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: block_id
+        baseTableName: transfer
+        constraintName: fk_transfer_block
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: block
+        validate: true
+- changeSet:
+    id: 1765401902526-29
+    author: goldenera (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: device_id
+        baseTableName: user_account
+        constraintName: fk_user_account_device
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: device
+        validate: true
+- changeSet:
+    id: 1765401902526-30
+    author: goldenera (generated)
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: tracked_address_id
+        baseTableName: user_account
+        constraintName: fk_user_account_tracked_addr
+        deferrable: false
+        initiallyDeferred: false
+        referencedColumnNames: id
+        referencedTableName: tracked_address
+        validate: true
+

@@ -1,0 +1,26 @@
+/* Web app entry point CSS */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+/* Scan workspace packages for Tailwind classes */
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../packages/core/src/**/*.{ts,tsx}";
+
+/* Import shared theme from @project/ui */
+@import "../../../packages/ui/src/styles/theme.css";
+@import "../../../packages/ui/src/styles/globals.css";
+@import "../../../packages/core/src/styles/globals.css";
+
+/* iOS Chrome viewport fix - use JS-set height when available */
+html,
+body,
+#root {
+    height: 100%;
+    height: var(--app-height, 100%);
+    min-height: 100%;
+    min-height: var(--app-height, 100%);
+    max-height: 100%;
+    max-height: var(--app-height, 100%);
+}

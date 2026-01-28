@@ -1,0 +1,62 @@
+name: Purge GitHub Actions Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "DELETE" to confirm complete cache purge'
+        required: true
+        default: ""
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  purge-cache:
+    name: Purge All Cache Entries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate Safety Confirmation
+        if: ${{ github.event.inputs.confirmation != 'DELETE' }}
+        run: |
+          echo "::error::Operation aborted! Safety check failed."
+          echo "You must type 'DELETE' in the input field to execute this destructive action."
+          exit 1
+
+      - name: Install GitHub CLI Extension
+        run: gh extension install actions/gh-actions-cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Execute Cache Purge Loop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Starting cache cleanup for repository: $REPO"
+
+          while : ; do
+            echo "Fetching list of cache keys..."
+            
+            CACHE_KEYS=$(gh actions-cache list -R $REPO --limit 100 | cut -f 1)
+            
+            if [ -z "$CACHE_KEYS" ]; then
+              echo "No more cache entries found. Cleanup complete."
+              break
+            fi
+
+            echo "Found batch of keys. Deleting..."
+            
+            echo "$CACHE_KEYS" | while read -r KEY; do
+              if [ -n "$KEY" ]; then
+                echo "Deleting cache key: $KEY"
+                gh actions-cache delete "$KEY" -R $REPO --confirm || echo "Failed to delete $KEY, continuing..."
+              fi
+            done
+            
+            echo "Batch finished. Checking for remaining entries..."
+          done
+
+          echo "::notice::All cache entries have been successfully removed."

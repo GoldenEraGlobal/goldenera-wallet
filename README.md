@@ -48,7 +48,7 @@ services:
     environment:
       - POSTGRESQL_HOST=db
       - LOGGING_FILE=${LOGGING_FILE:-wallet.log}
-      - JAVA_OPTS=-Xmx1g -Xms4g
+      - JAVA_OPTS=-Xmx4g -Xms1g
     ports:
       - "${LISTEN_PORT:-8080}:8080"
     volumes:

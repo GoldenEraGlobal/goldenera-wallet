@@ -66,4 +66,4 @@ WORKDIR /app
 COPY --from=backend-build /app-backend/target/*.jar app.jar
 
 # This line specifies the command to run on container start
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

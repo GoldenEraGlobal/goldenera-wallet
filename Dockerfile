@@ -53,7 +53,9 @@ COPY src ./src
 COPY --from=frontend-build /app-frontend/apps/web/dist ./src/main/resources/static
 
 # Run the build with the generated settings.xml
-RUN mvn clean package -s settings.xml -DskipTests
+RUN --mount=type=secret,id=github_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
+    mvn clean package -s settings.xml -DskipTests
 
 # --- STAGE 3: Final Image ---
 FROM eclipse-temurin:21-jre-alpine

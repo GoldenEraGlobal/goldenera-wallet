@@ -359,6 +359,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 onSuccess?.(tx.hash)
                 form.reset()
                 setReviewData(null)
+                await new Promise((resolve) => setTimeout(resolve, 1000));
                 replace('DashboardPage', {})
             } else {
                 throw new Error(result?.message || 'Transaction rejected')

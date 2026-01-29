@@ -42,6 +42,7 @@ export const ScanQrCodePage = () => {
     const onScan = useCallback(async (data: string) => {
         const qrData = stringToQrData(data)
         await stopScan();
+        await new Promise((resolve) => setTimeout(resolve, 500));
         replace('TxSubmitPage', {
             data: {
                 recipient: qrData.address,

@@ -144,7 +144,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
     const selectedTokenAddress = form.watch('tokenAddress')
 
     // Fetch balance for selected token
-    const { data: balanceData } = useGetBalancesHook(
+    const { data: balanceData, refetch: refetchBalances } = useGetBalancesHook(
         {
             addresses: [address!],
             tokenAddresses: selectedTokenAddress.length > 0 ? [selectedTokenAddress, ZERO_ADDRESS] : [ZERO_ADDRESS]
@@ -170,16 +170,20 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
     const nativeTokenDecimals = nativeToken?.numberOfDecimals ?? 8
     const nativeTokenSymbol = nativeToken?.smallestUnitName || nativeToken?.name || ''
 
+    // Helper function to extract balance from balance data array
+    const getBalanceFromData = useCallback((data: typeof balanceData, tokenAddress: string) => {
+        if (!data || data.length === 0 || !tokenAddress) return null
+        return data.find(b => compareAddress(b.tokenAddress, tokenAddress)) ?? null
+    }, [])
+
     // Get balance for display (balanceData is an array directly)
     const balance = useMemo(() => {
-        if (!balanceData || balanceData.length === 0 || !selectedTokenAddress) return null
-        return balanceData.find(b => compareAddress(b.tokenAddress, selectedTokenAddress)) ?? null
-    }, [balanceData, selectedTokenAddress])
+        return getBalanceFromData(balanceData, selectedTokenAddress)
+    }, [balanceData, selectedTokenAddress, getBalanceFromData])
 
     const nativeBalance = useMemo(() => {
-        if (!balanceData || balanceData.length === 0) return null
-        return balanceData.find(b => compareAddress(b.tokenAddress, ZERO_ADDRESS)) ?? null
-    }, [balanceData])
+        return getBalanceFromData(balanceData, ZERO_ADDRESS)
+    }, [balanceData, getBalanceFromData])
 
     const [reviewData, setReviewData] = useState<TxSubmitForm | null>(null)
     const [submitError, setSubmitError] = useState<Error | null>(null)
@@ -193,6 +197,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
         let isError = false
 
         const nonce = await refetchNextNonce()
+        const balances = await refetchBalances()
 
         // Parse amount using the correct decimals and compare as BigInt
         if (typeof nonce.data === 'undefined' || nonce.data === null || !!nonce.error) {
@@ -208,10 +213,14 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
             throw new Error('Could not fetch recommended fees')
         }
 
+        // Use freshly fetched balance data for validation
+        const liveTokenBalance = getBalanceFromData(balances.data, data.tokenAddress)
+        const liveNativeBalance = getBalanceFromData(balances.data, ZERO_ADDRESS)
+
         const feeWei = Amounts.wei(calculateFee(recommendedFees, data.fee))
         const amountWei = Amounts.parseWithDecimals(data.amount, tokenDecimals)
-        const tokenBalanceWei = BigInt(balance?.balance ?? '0')
-        const nativeBalanceWei = BigInt(nativeBalance?.balance ?? '0')
+        const tokenBalanceWei = BigInt(liveTokenBalance?.balance ?? '0')
+        const nativeBalanceWei = BigInt(liveNativeBalance?.balance ?? '0')
 
         if (isNativeToken(data.tokenAddress)) {
             // For native token: amount + fee must not exceed native balance
@@ -287,6 +296,8 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 throw new Error('Wallet is not unlocked')
             }
             const nonce = await refetchNextNonce()
+            const balances = await refetchBalances()
+
             if (typeof nonce.data === 'undefined' || nonce.data === null || nonce.error) {
                 throw new Error('Could not fetch nonce')
             }
@@ -297,13 +308,37 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 throw new Error('Could not fetch recommended fees')
             }
 
+            // Use freshly fetched balance data for validation
+            const liveTokenBalance = getBalanceFromData(balances.data, reviewData.tokenAddress)
+            const liveNativeBalance = getBalanceFromData(balances.data, ZERO_ADDRESS)
+
+            const feeWei = Amounts.wei(calculateFee(recommendedFees, reviewData.fee))
+            const amountWei = Amounts.parseWithDecimals(reviewData.amount, tokenDecimals ?? DECIMALS.STANDARD)
+            const tokenBalanceWei = BigInt(liveTokenBalance?.balance ?? '0')
+            const nativeBalanceWei = BigInt(liveNativeBalance?.balance ?? '0')
+
+            // Validate balance before submitting
+            if (isNativeToken(reviewData.tokenAddress)) {
+                const totalRequired = amountWei + feeWei
+                if (totalRequired > nativeBalanceWei) {
+                    throw new Error('Insufficient balance for amount + fee')
+                }
+            } else {
+                if (amountWei > tokenBalanceWei) {
+                    throw new Error('Insufficient token balance')
+                }
+                if (feeWei > nativeBalanceWei) {
+                    throw new Error(`Insufficient ${nativeTokenSymbol} for fee`)
+                }
+            }
+
             // Build the transaction
             const tx = TxBuilder.create()
                 .type(TxType.TRANSFER)
                 .network(Network.MAINNET)
                 .recipient(reviewData.recipient as Address)
-                .amount(Amounts.parseWithDecimals(reviewData.amount, tokenDecimals ?? DECIMALS.STANDARD))
-                .fee(Amounts.wei(calculateFee(recommendedFees, reviewData.fee)))
+                .amount(amountWei)
+                .fee(feeWei)
                 .nonce(BigInt(nonce.data))
                 .tokenAddress(reviewData.tokenAddress as Address)
                 .sign(privateKey)

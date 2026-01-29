@@ -43,19 +43,21 @@ RUN echo "<settings><servers>" > settings.xml && \
     echo "  <server><id>github</id><username>${GITHUB_ACTOR}</username><password>\${env.GITHUB_TOKEN}</password></server>" >> settings.xml && \
     echo "</servers></settings>" >> settings.xml
 
+# Download dependencies first (this layer will be cached if pom.xml doesn't change)
 RUN --mount=type=secret,id=github_token \
     export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-    ./mvnw dependency:resolve dependency:resolve-plugins -s settings.xml || true
+    mvn dependency:resolve dependency:resolve-plugins -s settings.xml -B
 
+# Copy backend source code
 COPY src ./src
 
-# Copy frontend build from the previous stage
+# Copy frontend build from the previous stage (AFTER dependency resolution!)
 COPY --from=frontend-build /app-frontend/apps/web/dist ./src/main/resources/static
 
 # Run the build with the generated settings.xml
 RUN --mount=type=secret,id=github_token \
     export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-    mvn clean package -s settings.xml -DskipTests
+    mvn package -s settings.xml -DskipTests -B -o
 
 # --- STAGE 3: Final Image ---
 FROM eclipse-temurin:21-jre-alpine

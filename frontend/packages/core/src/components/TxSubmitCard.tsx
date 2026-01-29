@@ -244,7 +244,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
             // Build the transaction
             const tx = TxBuilder.create()
                 .type(TxType.TRANSFER)
-                .network(Network.TESTNET)
+                .network(Network.MAINNET)
                 .recipient(reviewData.recipient as Address)
                 .amount(Amounts.parseWithDecimals(reviewData.amount, tokenDecimals ?? DECIMALS.STANDARD))
                 .fee(Amounts.wei(calculateFee(recommendedFees, reviewData.fee)))

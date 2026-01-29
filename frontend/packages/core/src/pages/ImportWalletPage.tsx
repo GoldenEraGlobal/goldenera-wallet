@@ -140,7 +140,7 @@ export const ImportWalletPage: ActivityComponentType = () => {
                                 <Textarea
                                     id="mnemonic"
                                     placeholder="Enter your recovery phrase..."
-                                    className="min-h-[120px] resize-none font-mono text-sm"
+                                    className="min-h-[120px] resize-none font-mono text-sm break-all"
                                     {...mnemonicForm.register('mnemonic')}
                                 />
                                 {mnemonicFieldError && <FieldError>{mnemonicFieldError}</FieldError>}

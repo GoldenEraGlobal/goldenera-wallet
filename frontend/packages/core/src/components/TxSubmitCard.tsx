@@ -188,7 +188,11 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
         setSubmitError(null)
         let isError = false
 
-        if (data.amount > (balance?.balance ?? 0)) {
+        // Parse amount using the correct decimals and compare as BigInt
+        const amountWei = Amounts.parseWithDecimals(data.amount, tokenDecimals)
+        const balanceWei = BigInt(balance?.balance ?? '0')
+
+        if (amountWei > balanceWei) {
             form.setError('amount', {
                 type: 'manual',
                 message: 'Insufficient balance',
@@ -302,9 +306,11 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                                     <FieldLabel>Token</FieldLabel>
                                     <TokenSelect
                                         value={field.value}
-                                        onChange={field.onChange}
+                                        onChange={(e) => {
+                                            console.log(e)
+                                            field.onChange(e)
+                                        }}
                                         disabled={isLoadingTokens || field.disabled}
-                                        ref={field.ref as any}
                                         name={field.name}
                                     />
                                     {!!selectedToken && (
@@ -375,7 +381,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                                             disabled={field.disabled}
                                             name={field.name}
                                         >
-                                            <SelectTrigger className="w-full h-9" size="lg" ref={field.ref as any}>
+                                            <SelectTrigger className="w-full h-9" size="lg">
                                                 <SelectValue className="flex items-center gap-2">
                                                     {isLoadingTokens ? <Spinner /> : null}
                                                     <span>{selectedTokenLabel}</span>

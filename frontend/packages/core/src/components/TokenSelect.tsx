@@ -22,11 +22,10 @@ export interface TokenSelectProps {
     onChange?: (value?: Address | null | string) => void
     disabled?: boolean
     className?: string
-    ref?: React.RefObject<HTMLButtonElement>
     name?: string
 }
 
-export const TokenSelect = ({ value, onChange, disabled, className, ref, name }: TokenSelectProps) => {
+export const TokenSelect = ({ value, onChange, disabled, className, name }: TokenSelectProps) => {
     const [selectedToken, setSelectedToken] = useUncontrolledProp(value, NATIVE_TOKEN, onChange)
     const { data: tokensData, isLoading: isLoadingTokens } = useGetTokensHook()
     const tokens = tokensData || []
@@ -40,7 +39,7 @@ export const TokenSelect = ({ value, onChange, disabled, className, ref, name }:
             disabled={disabled || isLoadingTokens}
             name={name}
         >
-            <SelectTrigger className={cn("w-full h-9", className)} size="lg" ref={ref}>
+            <SelectTrigger className={cn("w-full h-9", className)} size="lg">
                 <SelectValue className="flex items-center gap-2">
                     {token && (
                         <Avatar className="size-5 after:border-none">

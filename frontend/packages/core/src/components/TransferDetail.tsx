@@ -143,9 +143,9 @@ export function TransferDetail({
                 {transfer && (
                     <div className="px-4 overflow-y-auto max-h-[60vh]">
                         <DataRow label="Type" value={formatTransferType(transfer.transferType)} />
-                        {!!transfer.txHash && <DataRow label="Tx hash" value={shortenAddress(transfer.txHash)} copyable />}
-                        {direction === 'received' && !!transfer.from && <DataRow label="From" value={shortenAddress(transfer.from)} copyable />}
-                        {direction === 'sent' && !!transfer.to && <DataRow label="To" value={shortenAddress(transfer.to)} copyable />}
+                        {!!transfer.txHash && <DataRow label="Tx hash" value={shortenAddress(transfer.txHash)} valueToCopy={transfer.txHash} copyable />}
+                        {direction === 'received' && !!transfer.from && <DataRow label="From" value={shortenAddress(transfer.from)} valueToCopy={transfer.from} copyable />}
+                        {direction === 'sent' && !!transfer.to && <DataRow label="To" value={shortenAddress(transfer.to)} valueToCopy={transfer.to} copyable />}
                         {!!transfer.fee && (<DataRow label="Network fee" value={transfer.fee ? `${formatWei(transfer.fee, nativeTokenDecimals)} ${nativeTokenSymbol}` : undefined} />)}
                         <DataRow label="Timestamp" value={formatFullTimestamp(transfer.timestamp)} />
                         {!!tokenSymbol && (

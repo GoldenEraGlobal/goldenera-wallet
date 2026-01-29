@@ -1,10 +1,11 @@
 import { CheckCircle2, Copy } from "lucide-react";
 import { useCopy } from "../hooks/useCopy";
 
-export const DataRow = ({ label, value, copyable }: { label: string; value: string | number | undefined; copyable?: boolean }) => {
+export const DataRow = ({ label, value, valueToCopy, copyable }: { label: string; value: string | number | undefined; valueToCopy?: string | number; copyable?: boolean }) => {
     const { copy, copied } = useCopy()
     if (value === undefined || value === null || value === '') return null
     const displayValue = String(value)
+    const copyValue = valueToCopy ?? value
 
     return (
         <div className="flex justify-between items-start gap-4 py-3 border-b border-border/50 last:border-b-0">
@@ -13,7 +14,7 @@ export const DataRow = ({ label, value, copyable }: { label: string; value: stri
                 <span className="text-sm text-right break-all">{displayValue}</span>
                 {copyable && (
                     <button
-                        onClick={() => copy(displayValue)}
+                        onClick={() => copy(String(copyValue))}
                         className="p-1 rounded hover:bg-muted transition-colors shrink-0"
                         type="button"
                     >

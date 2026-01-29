@@ -1,4 +1,4 @@
-import { Amounts, bytesToHex, DECIMALS, encodeTx, Network, TxBuilder, TxType, type Address } from '@goldenera/cryptoj'
+import { Amounts, bytesToHex, DECIMALS, encodeTx, Network, TxBuilder, TxType, ZERO_ADDRESS, type Address } from '@goldenera/cryptoj'
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
 import { TokenDtoV1, useGetBalancesHook, useGetMempoolRecommendedFeesHook, useGetNextNonceHook, useGetTokensHook, useSubmitTransactionHook, type MempoolRecommendedFeesDtoV1, type MempoolRecommendedFeesLevelDtoV1 } from "@project/api"
 import {
@@ -120,7 +120,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
     const address = useWalletStore(state => state.address)
     const privateKey = useWalletStore(state => state._privateKey)
     const { mutateAsync: submitTx, isPending: isSubmitting } = useSubmitTransactionHook()
-    const { data: nextNonce } = useGetNextNonceHook(
+    const { data: nextNonce, refetch: refetchNextNonce } = useGetNextNonceHook(
         { address: address! },
         { query: { enabled: !!address } }
     )
@@ -142,17 +142,16 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
     })
 
     const selectedTokenAddress = form.watch('tokenAddress')
-    const selectedFee = form.watch('fee')
 
     // Fetch balance for selected token
     const { data: balanceData } = useGetBalancesHook(
         {
             addresses: [address!],
-            tokenAddresses: selectedTokenAddress.length > 0 ? [selectedTokenAddress] : []
+            tokenAddresses: selectedTokenAddress.length > 0 ? [selectedTokenAddress, ZERO_ADDRESS] : [ZERO_ADDRESS]
         },
         {
             query: {
-                enabled: !!address && selectedTokenAddress.length > 0,
+                enabled: !!address
             },
         }
     )
@@ -173,8 +172,13 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
 
     // Get balance for display (balanceData is an array directly)
     const balance = useMemo(() => {
+        if (!balanceData || balanceData.length === 0 || !selectedTokenAddress) return null
+        return balanceData.find(b => compareAddress(b.tokenAddress, selectedTokenAddress)) ?? null
+    }, [balanceData, selectedTokenAddress])
+
+    const nativeBalance = useMemo(() => {
         if (!balanceData || balanceData.length === 0) return null
-        return balanceData[0]
+        return balanceData.find(b => compareAddress(b.tokenAddress, ZERO_ADDRESS)) ?? null
     }, [balanceData])
 
     const [reviewData, setReviewData] = useState<TxSubmitForm | null>(null)
@@ -188,16 +192,67 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
         setSubmitError(null)
         let isError = false
 
-        // Parse amount using the correct decimals and compare as BigInt
-        const amountWei = Amounts.parseWithDecimals(data.amount, tokenDecimals)
-        const balanceWei = BigInt(balance?.balance ?? '0')
+        const nonce = await refetchNextNonce()
 
-        if (amountWei > balanceWei) {
+        // Parse amount using the correct decimals and compare as BigInt
+        if (typeof nonce.data === 'undefined' || nonce.data === null || !!nonce.error) {
             form.setError('amount', {
                 type: 'manual',
-                message: 'Insufficient balance',
+                message: 'Failed to fetch nonce',
             })
             isError = true
+        }
+
+        const feeData = recommendedFees?.[data.fee]
+        if (!feeData) {
+            throw new Error('Could not fetch recommended fees')
+        }
+
+        const feeWei = Amounts.wei(calculateFee(recommendedFees, data.fee))
+        const amountWei = Amounts.parseWithDecimals(data.amount, tokenDecimals)
+        const tokenBalanceWei = BigInt(balance?.balance ?? '0')
+        const nativeBalanceWei = BigInt(nativeBalance?.balance ?? '0')
+
+        if (isNativeToken(data.tokenAddress)) {
+            // For native token: amount + fee must not exceed native balance
+            const totalRequired = amountWei + feeWei
+            if (totalRequired > nativeBalanceWei) {
+                // Determine which is the issue - amount, fee, or both
+                if (amountWei > nativeBalanceWei) {
+                    // Amount alone exceeds balance
+                    form.setError('amount', {
+                        type: 'manual',
+                        message: 'Insufficient balance',
+                    })
+                } else {
+                    // Amount is ok, but amount + fee exceeds balance
+                    form.setError('amount', {
+                        type: 'manual',
+                        message: 'Insufficient balance for amount + fee',
+                    })
+                }
+                isError = true
+            }
+        } else {
+            // For other tokens: check token balance for amount, native balance for fee
+
+            // Check if we have enough of the token for the amount
+            if (amountWei > tokenBalanceWei) {
+                form.setError('amount', {
+                    type: 'manual',
+                    message: 'Insufficient token balance',
+                })
+                isError = true
+            }
+
+            // Check if we have enough native token for the fee
+            if (feeWei > nativeBalanceWei) {
+                form.setError('fee', {
+                    type: 'manual',
+                    message: `Insufficient ${nativeTokenSymbol} for fee`,
+                })
+                isError = true
+            }
         }
 
         if (selectedToken?.userBurnable === false && isZeroAddress(data.recipient)) {
@@ -231,7 +286,8 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
             if (!privateKey) {
                 throw new Error('Wallet is not unlocked')
             }
-            if (typeof nextNonce === 'undefined') {
+            const nonce = await refetchNextNonce()
+            if (typeof nonce.data === 'undefined' || nonce.data === null || nonce.error) {
                 throw new Error('Could not fetch nonce')
             }
 
@@ -241,6 +297,8 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 throw new Error('Could not fetch recommended fees')
             }
 
+            alert(nonce.data)
+
             // Build the transaction
             const tx = TxBuilder.create()
                 .type(TxType.TRANSFER)
@@ -248,7 +306,7 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 .recipient(reviewData.recipient as Address)
                 .amount(Amounts.parseWithDecimals(reviewData.amount, tokenDecimals ?? DECIMALS.STANDARD))
                 .fee(Amounts.wei(calculateFee(recommendedFees, reviewData.fee)))
-                .nonce(BigInt(nextNonce))
+                .nonce(BigInt(nonce.data))
                 .tokenAddress(reviewData.tokenAddress as Address)
                 .sign(privateKey)
 
@@ -497,7 +555,7 @@ const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, networ
                 {/* Scrollable key-value list */}
                 {!!data && !!token && !!nativeToken && (
                     <div className="px-4 overflow-y-auto max-h-[60vh] flex flex-col gap-1">
-                        <DataRow label="Recipient" value={shortenAddress(data.recipient)} copyable />
+                        <DataRow label="Recipient" value={shortenAddress(data.recipient)} valueToCopy={data.recipient} copyable />
                         <DataRow label="Network Fee" value={`${feeDisplay} ${nativeToken.smallestUnitName}`} />
                         <DataRow label="Token" value={token.name} />
                         <DataRow label="Amount" value={`${data.amount} ${token.smallestUnitName}`} />

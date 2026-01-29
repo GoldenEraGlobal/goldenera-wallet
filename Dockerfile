@@ -43,10 +43,11 @@ RUN echo "<settings><servers>" > settings.xml && \
     echo "  <server><id>github</id><username>${GITHUB_ACTOR}</username><password>\${env.GITHUB_TOKEN}</password></server>" >> settings.xml && \
     echo "</servers></settings>" >> settings.xml
 
-# Download ALL dependencies first including annotation processors (this layer will be cached if pom.xml doesn't change)
+# Pre-download dependencies (cached if pom.xml doesn't change)
+# Note: Some annotation processors may be downloaded during package, but main deps are cached
 RUN --mount=type=secret,id=github_token \
     export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
-    mvn dependency:go-offline -s settings.xml -B
+    mvn dependency:resolve dependency:resolve-plugins -s settings.xml -B || true
 
 # Copy backend source code
 COPY src ./src
@@ -54,7 +55,7 @@ COPY src ./src
 # Copy frontend build from the previous stage (AFTER dependency resolution!)
 COPY --from=frontend-build /app-frontend/apps/web/dist ./src/main/resources/static
 
-# Run the build with the generated settings.xml (dependencies are already cached in previous layer)
+# Run the build (online - will download any missing deps like annotation processors)
 RUN --mount=type=secret,id=github_token \
     export GITHUB_TOKEN=$(cat /run/secrets/github_token) && \
     mvn package -s settings.xml -DskipTests -B

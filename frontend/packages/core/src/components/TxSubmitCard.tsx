@@ -297,8 +297,6 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 throw new Error('Could not fetch recommended fees')
             }
 
-            alert(nonce.data)
-
             // Build the transaction
             const tx = TxBuilder.create()
                 .type(TxType.TRANSFER)

@@ -186,9 +186,11 @@ public class WalletBusinessService {
         }
 
         // Calculate adjusted balance (ensure it doesn't go negative)
-        Wei adjustedBalance = balance.balance().subtract(pendingOutgoingSum);
-        if (adjustedBalance.compareTo(Wei.ZERO) < 0) {
+        Wei adjustedBalance;
+        if (pendingOutgoingSum.compareTo(balance.balance()) > 0) {
             adjustedBalance = Wei.ZERO;
+        } else {
+            adjustedBalance = balance.balance().subtract(pendingOutgoingSum);
         }
 
         return new WalletBalanceDtoV1(

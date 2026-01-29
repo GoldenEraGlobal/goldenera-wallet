@@ -31,12 +31,12 @@ import {
     SelectValue,
     Spinner
 } from "@project/ui"
-import { useFlow } from '@stackflow/react/future'
 import { Send, TriangleAlertIcon, X } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { NumericFormat } from "react-number-format"
 import z from "zod/v4"
+import { useFlow } from '../router/useFlow'
 import { useWalletStore } from "../store/WalletStore"
 import { compareAddress, formatWei, isNativeToken, isZeroAddress, shortenAddress } from "../utils/WalletUtil"
 import { DataRow } from './DataRow'
@@ -116,7 +116,7 @@ function calculateFee(
 }
 
 export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardProps) => {
-    const { replace } = useFlow()
+    const { replace, pop } = useFlow()
     const address = useWalletStore(state => state.address)
     const privateKey = useWalletStore(state => state._privateKey)
     const { mutateAsync: submitTx, isPending: isSubmitting } = useSubmitTransactionHook()
@@ -359,8 +359,8 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                 onSuccess?.(tx.hash)
                 form.reset()
                 setReviewData(null)
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-                replace('DashboardPage', {})
+                await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for success animation
+                pop()
             } else {
                 throw new Error(result?.message || 'Transaction rejected')
             }

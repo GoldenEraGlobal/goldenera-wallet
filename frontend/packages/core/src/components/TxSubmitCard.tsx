@@ -181,10 +181,6 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
         return getBalanceFromData(balanceData, selectedTokenAddress)
     }, [balanceData, selectedTokenAddress, getBalanceFromData])
 
-    const nativeBalance = useMemo(() => {
-        return getBalanceFromData(balanceData, ZERO_ADDRESS)
-    }, [balanceData, getBalanceFromData])
-
     const [reviewData, setReviewData] = useState<TxSubmitForm | null>(null)
     const [submitError, setSubmitError] = useState<Error | null>(null)
 
@@ -357,9 +353,8 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
             // Check if transaction was successful
             if (result?.status === 'SUCCESS') {
                 onSuccess?.(tx.hash)
-                form.reset()
                 setReviewData(null)
-                await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for success animation
+                await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for success animation
                 pop()
             } else {
                 throw new Error(result?.message || 'Transaction rejected')

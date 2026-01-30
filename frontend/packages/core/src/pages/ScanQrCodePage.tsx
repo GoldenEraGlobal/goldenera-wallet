@@ -38,19 +38,7 @@ export const ScanQrCodePage = () => {
     const isMounted = useRef(false);
     const didInit = useRef(false); // Prevents double init in Strict Mode
     const isRequestingPermission = useRef(false);
-
-    const onScan = useCallback(async (data: string) => {
-        const qrData = stringToQrData(data)
-        await stopScan();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        replace('TxSubmitPage', {
-            data: {
-                recipient: qrData.address,
-                amount: qrData.amount,
-                tokenAddress: qrData.tokenAddress
-            }
-        })
-    }, [replace]);
+    const hasNavigated = useRef(false); // Prevent double navigation
 
     const stopScan = useCallback(async () => {
         setScannerActive(false);
@@ -65,6 +53,24 @@ export const ScanQrCodePage = () => {
         }
         didInit.current = false;
     }, []);
+
+    const onScan = useCallback((data: string) => {
+        // Prevent double navigation from multiple scans
+        if (hasNavigated.current) return;
+        hasNavigated.current = true;
+
+        const qrData = stringToQrData(data)
+        // Stop scan in background - don't await to avoid blocking navigation
+        stopScan()
+        // Use replace to remove ScanQrCodePage from stack - when user pops from TxSubmitPage, they go to TokenDetailPage
+        replace('TxSubmitPage', {
+            data: {
+                recipient: qrData.address,
+                amount: qrData.amount,
+                tokenAddress: qrData.tokenAddress
+            }
+        })
+    }, [replace, stopScan]);
 
     const initScanner = useCallback(async () => {
         if (didInit.current || isRequestingPermission.current) return;
@@ -176,8 +182,20 @@ export const ScanQrCodePage = () => {
         };
     }, []);
 
+    const onCancel = () => {
+        // Prevent double navigation
+        if (hasNavigated.current) return;
+        hasNavigated.current = true;
+
+        // Pop first, then cleanup in background
+        pop()
+        stopScan()
+    }
+
     return (
-        <AppLayout title="Scan QR Code" transparent={isNative && isScanning} swipeBack={false} padding={false}>
+        <AppLayout title="Scan QR Code" transparent={isNative && isScanning} swipeBack={false} padding={false} backButton={{
+            onClick: onCancel
+        }}>
             <div className='h-full w-full relative overflow-hidden'>
                 {!isNative && (
                     <div className="absolute inset-0 z-0">
@@ -224,7 +242,7 @@ export const ScanQrCodePage = () => {
                             <Button size='icon-xl' variant="white" onClick={toggleTorch} style={{ display: torchAvailable ? 'flex' : 'none' }}>
                                 {torchEnabled ? <FlashlightOff /> : <Flashlight />}
                             </Button>
-                            <Button size='icon-xl' variant="white" onClick={() => pop()}>
+                            <Button size='icon-xl' variant="white" onClick={onCancel}>
                                 <XIcon />
                             </Button>
                         </div>

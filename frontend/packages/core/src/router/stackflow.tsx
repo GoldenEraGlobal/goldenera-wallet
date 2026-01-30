@@ -49,6 +49,8 @@ class CleanableHistory {
     private popstateHandler: ((event: PopStateEvent) => void) | null = null
     private listeners: Set<() => void> = new Set()
     private historyIndex = 0 // Track our position in browser history
+    private processingPop = false
+    private instanceId = Date.now().toString(36) + Math.random().toString(36).substr(2)
 
     constructor() {
         this.history = createMemoryHistory()
@@ -57,22 +59,48 @@ class CleanableHistory {
     // Sync with browser for back/forward button support
     startBrowserSync() {
         if (typeof window !== 'undefined') {
-            // Initialize browser history state with index
-            window.history.replaceState({ index: this.historyIndex }, '', window.location.href)
+            // Update current entry with our instanceId
+            window.history.replaceState({
+                index: this.historyIndex,
+                instanceId: this.instanceId
+            }, '', window.location.href)
 
             this.popstateHandler = (event: PopStateEvent) => {
-                const newIndex = event.state?.index ?? 0
-                const delta = newIndex - this.historyIndex
+                this.processingPop = true
+                try {
+                    const state = event.state
 
-                if (delta < 0) {
-                    // Going back
-                    this.history.go(delta)
-                } else if (delta > 0) {
-                    // Going forward
-                    this.history.go(delta)
+                    // Check if this state belongs to our current history session
+                    if (state?.instanceId === this.instanceId) {
+                        const newIndex = state.index ?? 0
+                        const delta = newIndex - this.historyIndex
+
+                        this.historyIndex = newIndex
+
+                        if (delta !== 0) {
+                            this.history.go(delta)
+                        }
+                    } else {
+                        // Mismatch or foreign state (e.g. from reload or other session)
+                        // Force sync logic: Adopt this browser URL into our memory history
+                        // Extract path from hash
+                        const hash = window.location.hash
+                        const path = hash.startsWith('#') ? hash.substring(1) : '/'
+
+                        this.history.replace(path)
+
+                        // We reset our index logic effectively for this "new" entry
+                        // But we should claim it in browser state to prevent future mismatches
+                        this.historyIndex = state?.index ?? 0 // Adopt the browser's index if available to keep relative continuity if possible
+
+                        window.history.replaceState({
+                            index: this.historyIndex,
+                            instanceId: this.instanceId
+                        }, '', window.location.href)
+                    }
+                } finally {
+                    this.processingPop = false
                 }
-
-                this.historyIndex = newIndex
             }
             window.addEventListener('popstate', this.popstateHandler)
         }
@@ -94,7 +122,7 @@ class CleanableHistory {
         if (typeof window !== 'undefined') {
             this.historyIndex++
             window.history.pushState(
-                { index: this.historyIndex },
+                { index: this.historyIndex, instanceId: this.instanceId },
                 '',
                 window.location.pathname + '#' + this.history.location.pathname
             )
@@ -105,27 +133,45 @@ class CleanableHistory {
         this.history.replace(...args)
         if (typeof window !== 'undefined') {
             window.history.replaceState(
-                { index: this.historyIndex },
+                { index: this.historyIndex, instanceId: this.instanceId },
                 '',
                 window.location.pathname + '#' + this.history.location.pathname
             )
         }
     }
 
-    go(delta: number) {
-        this.history.go(delta)
-    }
-
     back() {
-        this.history.back()
+        if (typeof window !== 'undefined' && this.historyIndex > 0) {
+            window.history.back()
+        } else {
+            if (this.historyIndex > 0) {
+                this.historyIndex--
+            }
+            this.history.back()
+        }
     }
 
     forward() {
-        this.history.forward()
+        if (typeof window !== 'undefined') {
+            window.history.forward()
+        } else {
+            this.historyIndex++
+            this.history.forward()
+        }
     }
 
     listen(listener: Parameters<History['listen']>[0]) {
-        const unlisten = this.history.listen(listener)
+        const unlisten = this.history.listen((update) => {
+            // Always sync browser hash after any navigation to ensure consistency
+            if (typeof window !== 'undefined') {
+                window.history.replaceState(
+                    { index: this.historyIndex, instanceId: this.instanceId },
+                    '',
+                    window.location.pathname + '#' + update.location.pathname
+                )
+            }
+            listener(update)
+        })
         this.listeners.add(unlisten)
         return () => {
             unlisten()
@@ -150,7 +196,7 @@ class CleanableHistory {
         this.history.replace('/')
         if (typeof window !== 'undefined') {
             window.history.replaceState(
-                { index: this.historyIndex },
+                { index: this.historyIndex, instanceId: this.instanceId },
                 '',
                 window.location.pathname + '#/'
             )

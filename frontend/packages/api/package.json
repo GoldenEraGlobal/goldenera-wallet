@@ -35,11 +35,11 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@kubb/cli": "^4.19.2",
-    "@kubb/core": "^4.19.2",
-    "@kubb/plugin-oas": "^4.19.2",
-    "@kubb/plugin-react-query": "^4.19.2",
-    "@kubb/plugin-ts": "^4.19.2",
+    "@kubb/cli": "^4.20.0",
+    "@kubb/core": "^4.20.0",
+    "@kubb/plugin-oas": "^4.20.0",
+    "@kubb/plugin-react-query": "^4.20.0",
+    "@kubb/plugin-ts": "^4.20.0",
     "@tanstack/react-query": "^5.90.20",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",

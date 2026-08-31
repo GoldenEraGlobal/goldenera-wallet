@@ -73,3 +73,7 @@ application-h2-2.properties
 .github_creds
 .temp_gh_token
 /wallet_logs
+.codex
+.agents
+CLAUDE.md
+AGENTS.md

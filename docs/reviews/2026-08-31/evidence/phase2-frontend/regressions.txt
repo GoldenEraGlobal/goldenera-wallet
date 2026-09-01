@@ -1,9 +1,0 @@
-
- RUN  v4.1.11 /home/andrej/Projects/goldenera/goldenera-wallet/frontend
-
-
- Test Files  4 passed (4)
-      Tests  34 passed (34)
-   Start at  21:30:16
-   Duration  1.69s (transform 251ms, setup 80ms, import 1.22s, tests 1.13s, environment 742ms)
-

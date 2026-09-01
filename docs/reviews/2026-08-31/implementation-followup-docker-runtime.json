@@ -1,8 +1,0 @@
-{
-  "cryptoJJarSha256": "7d5eadaf13d4451d473e4eaf990dc52bedbde9fac3b13142f8f16e14f68ed30e",
-  "status": "PASS",
-  "containerRuntime": "openjdk version \"25.0.4\" 2026-07-21 LTS",
-  "httpFilesVerified": 30,
-  "cleanupComplete": true,
-  "ownContainersRemoved": true
-}

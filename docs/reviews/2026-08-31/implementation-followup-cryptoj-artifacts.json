@@ -1,7 +1,0 @@
-{
-  "jarSha256": "f4b7f896c953a5929b579e3b92f83141f0eda8dcbfc5aec5e9d936e184bccb37",
-  "dockerImageId": "sha256:d3bc4414a45a5973bfe9dbed77779a46fca753136ce431f0446e4ff0bf7c3f10",
-  "localDockerTag": "goldenera-wallet-followup:final",
-  "multiarchOci": "/tmp/wallet-followup-runtime-multiarch.oci",
-  "ownedProcessesAndContainersRemoved": true
-}

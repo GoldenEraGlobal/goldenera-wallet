@@ -1,0 +1,100 @@
+[
+  {
+    "name": "junit",
+    "latest": "4.13.2",
+    "source": "https://repo.maven.apache.org/maven2/junit/junit/maven-metadata.xml"
+  },
+  {
+    "name": "cordova-android",
+    "latest": "15.1.0",
+    "source": "https://repo.maven.apache.org/maven2/org/apache/cordova/framework/maven-metadata.xml"
+  },
+  {
+    "name": "actions/checkout",
+    "latest": "v7.0.1",
+    "source": "https://github.com/actions/checkout/releases/tag/v7.0.1",
+    "published": "2026-07-20T15:10:05Z",
+    "current": "v4",
+    "impact": "checkout credentials, bezpečnost PR fetch a runner runtime"
+  },
+  {
+    "name": "actions/setup-node",
+    "latest": "v7.0.0",
+    "source": "https://github.com/actions/setup-node/releases/tag/v7.0.0",
+    "published": "2026-07-14T02:46:05Z",
+    "current": "v4",
+    "impact": "ESM; cache outputs, odstraněný dummy NODE_AUTH_TOKEN"
+  },
+  {
+    "name": "actions/setup-java",
+    "latest": "v6.0.0",
+    "source": "https://github.com/actions/setup-java/releases/tag/v6.0.0",
+    "published": "2026-08-24T15:53:25Z",
+    "current": "v4",
+    "impact": "ESM, jdkFile alias -> jdk-file; repo používá distribution temurin"
+  },
+  {
+    "name": "actions/cache",
+    "latest": "v6.1.0",
+    "source": "https://github.com/actions/cache/releases/tag/v6.1.0",
+    "published": "2026-06-26T19:17:06Z",
+    "current": "v4",
+    "impact": "cache access/read-only režim a cache key kontinuita"
+  },
+  {
+    "name": "pnpm/action-setup",
+    "latest": "v6.0.10",
+    "source": "https://github.com/pnpm/action-setup/releases/tag/v6.0.10",
+    "published": "2026-08-03T12:06:25Z",
+    "current": "v4",
+    "impact": "release odkazuje na nástupce pnpm/setup; zvolit migraci zvlášť, zachovat packageManager pin"
+  },
+  {
+    "name": "docker/login-action",
+    "latest": "v4.6.0",
+    "source": "https://github.com/docker/login-action/releases/tag/v4.6.0",
+    "published": "2026-07-29T12:12:00Z",
+    "current": "v3",
+    "impact": "registry credential scopes a buildx auth"
+  },
+  {
+    "name": "docker/setup-buildx-action",
+    "latest": "v4.3.0",
+    "source": "https://github.com/docker/setup-buildx-action/releases/tag/v4.3.0",
+    "published": "2026-08-19T09:41:47Z",
+    "current": "v3",
+    "impact": "builder driver, platformy, BuildKit a runner"
+  },
+  {
+    "name": "docker/metadata-action",
+    "latest": "v6.2.0",
+    "source": "https://github.com/docker/metadata-action/releases/tag/v6.2.0",
+    "published": "2026-07-02T08:55:18Z",
+    "current": "v5",
+    "impact": "tag/label outputs použité navazujícím buildem"
+  },
+  {
+    "name": "docker/build-push-action",
+    "latest": "v7.3.0",
+    "source": "https://github.com/docker/build-push-action/releases/tag/v7.3.0",
+    "published": "2026-07-01T14:24:45Z",
+    "current": "v5",
+    "impact": "build contexts, secret předání, cache, digest a multiarch manifest"
+  },
+  {
+    "name": "actions/upload-artifact",
+    "latest": "v7.0.1",
+    "source": "https://github.com/actions/upload-artifact/releases/tag/v7.0.1",
+    "published": "2026-04-10T17:31:14Z",
+    "current": "v4",
+    "impact": "direct upload/API a návazné download jobs"
+  },
+  {
+    "name": "actions/download-artifact",
+    "latest": "v8.0.1",
+    "source": "https://github.com/actions/download-artifact/releases/tag/v8.0.1",
+    "published": "2026-03-11T15:44:25Z",
+    "current": "v4",
+    "impact": "artifact formát/jméno a návaznost na upload major"
+  }
+]

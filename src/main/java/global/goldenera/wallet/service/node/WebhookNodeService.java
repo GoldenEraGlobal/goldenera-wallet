@@ -68,10 +68,10 @@ public class WebhookNodeService {
      * @param enabled
      *            Enable/disable flag
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public WebhookDtoV1 setWebhookEnabled(boolean enabled) {
         return webhookApi
-                .apiV1WebhookSetEnabled(nodeProperties.getWebhookUid(), new WebhookSetEnabledInDtoV1().enabled(enabled))
+                .apiV1WebhookSetEnabled(nodeProperties.getWebhookUid().toString(), new WebhookSetEnabledInDtoV1().enabled(enabled))
                 .getBody();
     }
 
@@ -97,7 +97,7 @@ public class WebhookNodeService {
      * @param tokenAddressFilter
      *            Optional filter by token address
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public WebhookEventDtoV1Page getEventPage(
             Integer pageNumber,
             Integer pageSize,
@@ -106,7 +106,7 @@ public class WebhookNodeService {
             Address addressFilter,
             Address tokenAddressFilter) {
         return webhookEventApi
-                .apiV1WebhookEventGetPage(nodeProperties.getWebhookUid(), pageNumber, pageSize, direction, type,
+                .apiV1WebhookEventGetPage(nodeProperties.getWebhookUid().toString(), pageNumber, pageSize, direction, type,
                         addressFilter != null ? addressFilter.toChecksumAddress() : null,
                         tokenAddressFilter != null ? tokenAddressFilter.toChecksumAddress() : null)
                 .getBody();
@@ -119,9 +119,9 @@ public class WebhookNodeService {
      *            List of event configurations to subscribe to
      * @return Number of events subscribed
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Integer subscribeToEvents(List<WebhookEventDtoV1> events) {
-        return webhookEventApi.apiV1WebhookEventSubscribe(nodeProperties.getWebhookUid(), events).getBody();
+        return webhookEventApi.apiV1WebhookEventSubscribe(nodeProperties.getWebhookUid().toString(), events).getBody();
     }
 
     /**
@@ -131,8 +131,8 @@ public class WebhookNodeService {
      *            List of event configurations to unsubscribe from
      * @return Number of events unsubscribed
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Integer unsubscribeFromEvents(List<WebhookEventDtoV1> events) {
-        return webhookEventApi.apiV1WebhookEventUnsubscribe(nodeProperties.getWebhookUid(), events).getBody();
+        return webhookEventApi.apiV1WebhookEventUnsubscribe(nodeProperties.getWebhookUid().toString(), events).getBody();
     }
 }

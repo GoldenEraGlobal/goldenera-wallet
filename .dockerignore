@@ -4,3 +4,14 @@ target
 .git
 dist
 frontend/apps/web/dist
+# Never include developer credentials or local review/runtime state in build context.
+.env
+.env.*
+**/.env
+**/.env.*
+.agents
+.codex
+docs/reviews
+**/.turbo
+**/playwright-report
+**/test-results

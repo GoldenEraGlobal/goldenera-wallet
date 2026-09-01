@@ -1,6 +1,7 @@
-import { FamilyDrawerAnimatedContent, FamilyDrawerAnimatedWrapper, FamilyDrawerButton, FamilyDrawerClose, FamilyDrawerContent, FamilyDrawerOverlay, FamilyDrawerPortal, FamilyDrawerRoot, FamilyDrawerViewContent, useTheme, ViewsRegistry } from "@project/ui";
-import { Moon, Sun, SunMoon } from "lucide-react";
-import { useState } from "react";
+import type { ViewsRegistry } from '@project/ui'
+import { FamilyDrawerAnimatedContent, FamilyDrawerAnimatedWrapper, FamilyDrawerButton, FamilyDrawerClose, FamilyDrawerContent, FamilyDrawerOverlay, FamilyDrawerPortal, FamilyDrawerRoot, FamilyDrawerViewContent, useTheme } from '@project/ui'
+import { Moon, Sun, SunMoon } from 'lucide-react'
+import { useState } from 'react'
 
 export interface ChangeThemeProps {
     children: (open: () => void) => React.ReactNode
@@ -43,7 +44,13 @@ export function ChangeTheme({ children }: ChangeThemeProps) {
     return (
         <>
             {children(() => setOpen(true))}
-            <FamilyDrawerRoot views={minimalViews} open={open} onOpenChange={setOpen}>
+            <FamilyDrawerRoot
+                views={minimalViews}
+                open={open}
+                onOpenChange={setOpen}
+                title="Change theme"
+                description="Choose the wallet color theme"
+            >
                 <FamilyDrawerPortal>
                     <FamilyDrawerOverlay />
                     <FamilyDrawerContent>

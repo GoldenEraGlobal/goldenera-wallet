@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: wallet-device-account-cascade-v1
+      author: goldenera
+      changes:
+        - dropForeignKeyConstraint:
+            baseTableName: user_account
+            constraintName: fk_user_account_device
+        - addForeignKeyConstraint:
+            baseTableName: user_account
+            baseColumnNames: device_id
+            constraintName: fk_user_account_device
+            referencedTableName: device
+            referencedColumnNames: id
+            onDelete: CASCADE
+            validate: true
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: user_account
+            constraintName: fk_user_account_device
+        - addForeignKeyConstraint:
+            baseTableName: user_account
+            baseColumnNames: device_id
+            constraintName: fk_user_account_device
+            referencedTableName: device
+            referencedColumnNames: id
+            validate: true

@@ -1,0 +1,9 @@
+
+> frontend@1.0.0 typecheck /tmp/goldenera-wallet-review/frontend
+> turbo typecheck
+
+• turbo 2.8.0
+  x Missing tasks in project
+  `->   x Could not find task `typecheck` in project
+
+ ELIFECYCLE  Command failed with exit code 1.

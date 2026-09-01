@@ -1,0 +1,20 @@
+$ turbo run typecheck --filter=web
+• turbo 2.10.12
+
+   • Packages in scope: web
+   • Running typecheck in 1 packages
+   • Remote caching disabled
+
+@project/ui:typecheck: cache miss, executing 4dc8b659d77f37e6
+@project/api:typecheck: cache miss, executing 1717cfb449bb26ea
+@project/ui:typecheck: $ tsc --noEmit
+@project/api:typecheck: $ tsc --noEmit
+@project/core:typecheck: cache miss, executing b01bdae2d748941d
+@project/core:typecheck: $ tsc --noEmit
+web:typecheck: cache miss, executing 9f01de9a2817a477
+web:typecheck: $ tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json
+
+ Tasks:    4 successful, 4 total
+Cached:    0 cached, 4 total
+  Time:    8.343s 
+

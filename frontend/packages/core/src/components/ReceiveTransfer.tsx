@@ -1,6 +1,6 @@
 import { Share } from '@capacitor/share'
 import { NATIVE_TOKEN } from '@goldenera/cryptoj'
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
 import { useGetTokensHook } from '@project/api'
 import {
     Avatar,
@@ -27,7 +27,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { CustomQRCode } from "custom-qr-code/react"
+import { CustomQRCode } from 'custom-qr-code/react'
 import {
     Copy,
     Download,
@@ -35,28 +35,17 @@ import {
     X
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Controller, useForm } from "react-hook-form"
-import { NumericFormat } from "react-number-format"
-import z from "zod"
+import { Controller, useForm } from 'react-hook-form'
+import { NumericFormat } from 'react-number-format'
+import z from 'zod'
 import { useCopy } from '../hooks/useCopy'
 import { useShareSupported } from '../hooks/useShareSupported'
 import { useWalletStore } from '../store/WalletStore'
 import { qrToString } from '../utils/QrUtil'
+import { parseTokenAmount } from '../utils/TokenAmount'
 import { compareAddress, formatWei } from '../utils/WalletUtil'
 
-const amountSchema = z.object({
-    amount: z.string().refine((value) => {
-        if (!value || value === '') {
-            return true
-        }
-        try {
-            return parseFloat(value) > 0
-        } catch {
-            return false
-        }
-    }, 'Amount must be greater than 0')
-})
-
+const amountSchema = z.object({ amount: z.string() })
 type AmountFormValues = z.infer<typeof amountSchema>
 
 interface SetAmountDialogProps {
@@ -70,7 +59,12 @@ interface SetAmountDialogProps {
 
 function SetAmountDialog({ open, onOpenChange, onConfirm, initialAmount, tokenSymbol, tokenDecimals = 8 }: SetAmountDialogProps) {
     const form = useForm<AmountFormValues>({
-        resolver: standardSchemaResolver(amountSchema),
+        resolver: standardSchemaResolver(amountSchema.superRefine(({ amount }, context) => {
+            if (amount === '') return
+            try { parseTokenAmount(amount, tokenDecimals) } catch (error) {
+                context.addIssue({ code: 'custom', path: ['amount'], message: error instanceof Error ? error.message : 'Invalid amount' })
+            }
+        })),
         defaultValues: {
             amount: initialAmount || ''
         }
@@ -107,7 +101,6 @@ function SetAmountDialog({ open, onOpenChange, onConfirm, initialAmount, tokenSy
                                     placeholder={formatWei('0', tokenDecimals)}
                                     allowNegative={false}
                                     thousandSeparator=","
-                                    decimalScale={tokenDecimals}
                                     decimalSeparator="."
                                     allowedDecimalSeparators={['.', ',']}
                                     inputMode="decimal"

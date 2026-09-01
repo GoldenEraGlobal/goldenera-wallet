@@ -1,0 +1,49 @@
+apps/web                                 |  WARN  The field "pnpm.overrides" was found in /tmp/goldenera-wallet-review/frontend/apps/web/package.json. This will not take effect. You should configure "pnpm.overrides" at the root of the workspace instead.
+
+> extension@0.0.1 build /tmp/goldenera-wallet-review/frontend/apps/extension
+> vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 3569 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/service-worker-loader.js                                  0.05 kB
+dist/manifest.json                                             0.56 kB │ gzip:   0.30 kB
+dist/src/sidepanel/index.html                                  0.76 kB │ gzip:   0.44 kB
+dist/src/popup/index.html                                      0.77 kB │ gzip:   0.44 kB
+dist/public/logo.png                                           0.90 kB
+dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2       10.25 kB
+dist/.vite/manifest.json                                      10.46 kB │ gzip:   1.12 kB
+dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2        11.23 kB
+dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2         18.75 kB
+dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2            19.00 kB
+dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2     25.96 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2            48.26 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2        85.07 kB
+dist/assets/index-DHri2F0B.css                               120.37 kB │ gzip:  17.68 kB
+dist/assets/service-worker.ts-BSDhoYBw.js                      0.34 kB │ gzip:   0.23 kB
+dist/assets/index.html-DhdYLTmW.js                             0.35 kB │ gzip:   0.28 kB
+dist/assets/web-BequjUVR.js                                    0.36 kB │ gzip:   0.25 kB
+dist/assets/index.html-DYNnTqna.js                             0.37 kB │ gzip:   0.29 kB
+dist/assets/web-CuWXBIfc-DnJB96cy.js                           0.44 kB │ gzip:   0.25 kB
+dist/assets/web-8KR6jK_7.js                                    1.00 kB │ gzip:   0.43 kB
+dist/assets/web-BN_-kgR0.js                                    1.25 kB │ gzip:   0.59 kB
+dist/assets/web-CIK_tT1-.js                                    1.25 kB │ gzip:   0.52 kB
+dist/assets/pwa-toast.entry-BmVyN038.js                        1.56 kB │ gzip:   0.73 kB
+dist/assets/pwa-action-sheet.entry-ICmY_Jbl.js                 2.94 kB │ gzip:   1.08 kB
+dist/assets/web-BMkbdhVz.js                                    2.96 kB │ gzip:   1.00 kB
+dist/assets/pwa-camera-modal.entry-CiN09c18.js                 2.98 kB │ gzip:   1.31 kB
+dist/assets/pwa-camera-modal-instance.entry-DRhFVl8O.js        3.41 kB │ gzip:   1.48 kB
+dist/assets/pwa-camera.entry-t1q_MszT.js                      22.78 kB │ gzip:   6.73 kB
+dist/assets/index-Bgd6PRbw.js                              1,440.57 kB │ gzip: 444.67 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.23s
+[36mZip packing - "dist" folder :[0m
+[32m  - Preparing files.[0m
+[32m  - Creating zip archive.[0m
+[32m  - Done.[0m

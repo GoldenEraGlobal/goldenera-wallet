@@ -1,7 +1,7 @@
-import * as React from "react"
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react"
-import { cn } from "../../lib/utils"
-import { Spinner } from "./spinner"
+import * as React from 'react'
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
+import { cn } from '../../lib/utils'
+import { Spinner } from './spinner'
 
 // Pull-to-refresh configuration defaults
 const DEFAULT_THRESHOLD = 80 // Distance required to trigger refresh
@@ -392,7 +392,7 @@ function PullToRefreshIndicator({
                 }}
             >
                 <Spinner
-                    className={cn("size-6 text-background", isRefreshing && "animate-spin")}
+                    className={cn('size-6 text-background', isRefreshing && 'animate-spin')}
                     style={{
                         animation: isRefreshing ? undefined : 'none'
                     }}
@@ -456,11 +456,10 @@ function PullToRefreshInner({
         // Check for drawer-related data attributes
         const drawerSelectors = [
             '[data-slot="drawer"]',
+            '[data-slot="drawer-viewport"]',
+            '[data-slot="drawer-popup"]',
             '[data-slot="drawer-content"]',
-            '[data-slot="drawer-overlay"]',
-            '[data-vaul-drawer]',
-            '[data-vaul-drawer-visible]',
-            '[vaul-drawer]'
+            '[data-slot="drawer-overlay"]'
         ]
 
         // Check if element or any parent matches drawer selectors
@@ -596,7 +595,7 @@ function PullToRefreshInner({
     return (
         <div
             ref={containerRef}
-            className={cn("relative", className)}
+            className={cn('relative', className)}
             onTouchStart={handlers.onTouchStart}
             onTouchMove={handlers.onTouchMove}
             onTouchEnd={handlers.onTouchEnd}

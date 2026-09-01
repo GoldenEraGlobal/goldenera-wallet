@@ -6,7 +6,7 @@ import {
   PasswordInput,
   Switch
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import { ChevronLeft, Fingerprint, KeyRound, ScanFace, Shield } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -31,7 +31,7 @@ const passwordSchema = z.object({
 
 type PasswordForm = z.infer<typeof passwordSchema>
 
-export const CreateWalletPage: ActivityComponentType = () => {
+export const CreateWalletPage: ActivityComponentType<'CreateWalletPage'> = () => {
   const { pop } = useFlow()
   const createWallet = useWalletStore((state) => state.createWallet)
   const biometric = useWalletStore((state) => state.biometric)

@@ -6,7 +6,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertTriangle, Copy, Eye, EyeOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { UnlockCard } from '../components/auth/UnlockCard'
@@ -15,7 +15,7 @@ import { useCopy } from '../hooks/useCopy'
 import { AppLayout } from '../layouts/Layouts'
 import { privacyScreen } from '../utils/PrivacyUtil'
 
-export const ShowPhrasePage: ActivityComponentType = () => {
+export const ShowPhrasePage: ActivityComponentType<'ShowPhrasePage'> = () => {
     const { copy, copied } = useCopy()
     const [mnemonic, setMnemonic] = useState<string | null>(null)
     const [showMnemonic, setShowMnemonic] = useState(false)

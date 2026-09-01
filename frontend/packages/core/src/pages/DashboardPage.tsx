@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import {
   ArrowUpRight,
   CopyIcon,
@@ -26,7 +26,7 @@ import { AppLayout } from '../layouts/Layouts'
 import { useFlow } from '../router/useFlow'
 import { useWalletStore } from '../store/WalletStore'
 
-export const DashboardPage: ActivityComponentType = () => {
+export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
   const { copy, copied } = useCopy()
   const { push } = useFlow()
   const address = useWalletStore((state) => state.address)

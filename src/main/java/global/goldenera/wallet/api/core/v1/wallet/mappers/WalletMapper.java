@@ -29,7 +29,6 @@ import java.time.OffsetDateTime;
 
 import org.apache.tuweni.units.ethereum.Wei;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
 import global.goldenera.cryptoj.datatypes.Address;
@@ -41,6 +40,7 @@ import global.goldenera.wallet.api.core.v1.wallet.dtos.UnifiedTransferDtoV1.Tran
 import global.goldenera.wallet.api.core.v1.wallet.dtos.UnifiedTransferDtoV1.TransferType;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.WalletBalanceDtoV1;
 import global.goldenera.wallet.client.node.model.v1.AccountBalanceDtoV1;
+import global.goldenera.wallet.exceptions.GEFailedException;
 import global.goldenera.wallet.client.node.model.v1.FeeLevel;
 import global.goldenera.wallet.client.node.model.v1.MemTransferDtoV1;
 import global.goldenera.wallet.client.node.model.v1.RecommendedFeesDtoV1;
@@ -55,11 +55,24 @@ public interface WalletMapper {
     /**
      * Map AccountBalanceDtoV1 to WalletBalanceDtoV1.
      */
-    @Mapping(source = "address", target = "address", qualifiedByName = "stringToAddress")
-    @Mapping(source = "tokenAddress", target = "tokenAddress", qualifiedByName = "stringToTokenAddress")
-    @Mapping(source = "balance", target = "balance", qualifiedByName = "stringToWei")
-    @Mapping(source = "updatedAtTimestamp", target = "updatedAtTimestamp", qualifiedByName = "offsetDateTimeToInstant")
-    WalletBalanceDtoV1 toWalletBalance(AccountBalanceDtoV1 source);
+    default WalletBalanceDtoV1 toWalletBalance(AccountBalanceDtoV1 source) {
+        if (source == null) {
+            return null;
+        }
+        Wei total = stringToWei(source.getBalance());
+        Wei locked = source.getLockedMiningReward() == null ? Wei.ZERO : stringToWei(source.getLockedMiningReward());
+        if (total == null || locked == null || locked.compareTo(total) > 0) {
+            throw new GEFailedException("Node returned an invalid account balance");
+        }
+        Wei unlocked = total.subtract(locked);
+        Wei spendable = source.getSpendableBalance() == null ? unlocked : stringToWei(source.getSpendableBalance());
+        if (spendable == null || spendable.compareTo(unlocked) > 0) {
+            throw new GEFailedException("Node returned an invalid spendable balance");
+        }
+        return new WalletBalanceDtoV1(stringToAddress(source.getAddress()), stringToTokenAddress(source.getTokenAddress()),
+                spendable, source.getUpdatedAtBlockHeight(), offsetDateTimeToInstant(source.getUpdatedAtTimestamp()),
+                total, locked, spendable);
+    }
 
     /**
      * Map MemTransferDtoV1 (pending) to UnifiedTransferDtoV1.

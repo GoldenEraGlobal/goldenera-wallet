@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
+import org.springframework.http.server.PathContainer;
+import org.springframework.http.server.RequestPath;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 
@@ -64,7 +66,10 @@ public class ThrottlingService {
 
     private static final Map<Pattern, Integer> ENDPOINT_COSTS = new LinkedHashMap<>();
     static {
-
+        ENDPOINT_COSTS.put(Pattern.compile("/api/core/v1/wallet/balances"), 10);
+        ENDPOINT_COSTS.put(Pattern.compile("/api/core/v1/wallet/transfers"), 3);
+        ENDPOINT_COSTS.put(Pattern.compile("/api/core/v1/wallet/submit-tx"), 10);
+        ENDPOINT_COSTS.put(Pattern.compile("/api/core/v1/node-webhook/handle"), 10);
     }
 
     /**
@@ -83,12 +88,22 @@ public class ThrottlingService {
      * Handles Public Core vs API Key logic and calculating costs.
      */
     public boolean checkSpecificLimit(HttpServletRequest request, String keyIdentifier) {
-        String uri = request.getRequestURI();
+        String uri = getRequestPath(request);
         Bucket bucket = specificLogicCache.computeIfAbsent(keyIdentifier + ":" + getBucketType(uri),
                 k -> createBucketForContext(uri));
 
-        int cost = resolveCost(uri);
+        int cost = (int) Math.min(resolveCost(uri), throttlingProperties.getPublicCoreCapacity());
         return bucket.tryConsume(cost);
+    }
+
+    /** Use Spring's decoded routing segments for both API detection and endpoint cost. */
+    public String getRequestPath(HttpServletRequest request) {
+        StringBuilder path = new StringBuilder();
+        for (PathContainer.Element element : RequestPath.parse(request.getRequestURI(), request.getContextPath())
+                .pathWithinApplication().elements()) {
+            path.append(element instanceof PathContainer.PathSegment segment ? segment.valueToMatch() : element.value());
+        }
+        return path.toString();
     }
 
     private Bucket createBucketForContext(String uri) {

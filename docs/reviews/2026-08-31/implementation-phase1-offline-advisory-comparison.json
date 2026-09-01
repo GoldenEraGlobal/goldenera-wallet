@@ -1,0 +1,42 @@
+{
+  "scope": "Full workspace offline comparison against the previously user-authorized audit snapshot; not a fresh npm audit, not a PWA-only count. Paths are from the old graph and only representative.",
+  "oldUniqueGhsa": 180,
+  "remainingOldUniqueGhsa": 2,
+  "remainingOldAdvisoryRecords": 2,
+  "severityOfRemainingUniqueGhsa": {
+    "critical": 0,
+    "high": 2,
+    "moderate": 0,
+    "low": 0
+  },
+  "hits": [
+    {
+      "ghsa": "GHSA-mw96-cpmx-2vgc",
+      "package": "rollup",
+      "severity": "high",
+      "title": "Rollup 4 has Arbitrary File Write via Path Traversal",
+      "installedAffectedVersions": [
+        "2.79.2"
+      ],
+      "patchedRange": ">=2.80.0",
+      "url": "https://github.com/advisories/GHSA-mw96-cpmx-2vgc",
+      "originalRepresentativePaths": [
+        "apps__extension>@crxjs/vite-plugin>rollup"
+      ]
+    },
+    {
+      "ghsa": "GHSA-f88m-g3jw-g9cj",
+      "package": "sharp",
+      "severity": "high",
+      "title": "sharp inherited vulnerabilities in libvips: CVE-2026-33327, CVE-2026-33328, CVE-2026-35590, CVE-2026-35591",
+      "installedAffectedVersions": [
+        "0.33.5"
+      ],
+      "patchedRange": ">=0.35.0",
+      "url": "https://github.com/advisories/GHSA-f88m-g3jw-g9cj",
+      "originalRepresentativePaths": [
+        "apps__web>@vite-pwa/assets-generator>sharp"
+      ]
+    }
+  ]
+}

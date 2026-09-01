@@ -8,7 +8,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertTriangle, Copy, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { MnemonicGrid } from '../components/MnemonicGrid'
@@ -17,10 +17,12 @@ import { BasicLayout } from '../layouts/Layouts'
 import { useWalletStore } from '../store/WalletStore'
 import { privacyScreen } from '../utils/PrivacyUtil'
 
-export const BackupPhrasePage: ActivityComponentType = () => {
+export const BackupPhrasePage: ActivityComponentType<'BackupPhrasePage'> = () => {
     const { copy, copied } = useCopy()
     const backup = useWalletStore(state => state.backupWallet)
     const backupPhrase = useWalletStore(state => state.backupPhrase)
+    const error = useWalletStore(state => state.error)
+    const [pending, setPending] = useState(false)
     const [hasBackedUp, setHasBackedUp] = useState(false)
     const [showMnemonic, setShowMnemonic] = useState(false)
 
@@ -34,8 +36,11 @@ export const BackupPhrasePage: ActivityComponentType = () => {
         }
     }
 
-    const handleContinue = () => {
-        backup()
+    const handleContinue = async () => {
+        if (pending) return
+        setPending(true)
+        try { await backup() } catch { /* The store shows a retryable persistence error. */ }
+        finally { setPending(false) }
     }
 
     return (
@@ -51,6 +56,7 @@ export const BackupPhrasePage: ActivityComponentType = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
                     <Alert variant="destructive" className="bg-destructive/5 border-destructive/20">
                         <AlertTriangle />
                         <AlertDescription className="text-sm">
@@ -114,7 +120,7 @@ export const BackupPhrasePage: ActivityComponentType = () => {
                     <Button
                         size="lg"
                         className="w-full"
-                        disabled={!hasBackedUp}
+                        disabled={!hasBackedUp || pending}
                         onClick={handleContinue}
                     >
                         Continue to Wallet

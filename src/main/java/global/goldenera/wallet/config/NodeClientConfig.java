@@ -26,7 +26,6 @@ package global.goldenera.wallet.config;
 import static lombok.AccessLevel.PRIVATE;
 
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.concurrent.Executors;
 
 import org.springframework.context.annotation.Bean;
@@ -48,6 +47,7 @@ import global.goldenera.wallet.client.node.api.v1.TxApiV1Api;
 import global.goldenera.wallet.client.node.api.v1.WebhookApiV1Api;
 import global.goldenera.wallet.client.node.api.v1.WebhookEventApiV1Api;
 import global.goldenera.wallet.properties.NodeProperties;
+import global.goldenera.wallet.components.NodeResponseBufferingInterceptor;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 
@@ -57,23 +57,29 @@ import lombok.experimental.FieldDefaults;
 public class NodeClientConfig {
 
     NodeProperties nodeProperties;
+    NodeResponseBufferingInterceptor nodeResponseBufferingInterceptor;
     ConversionService conversionService;
 
     @Bean
     public HttpClient generalHttpClient() {
         return HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_2)
-                .connectTimeout(Duration.ofSeconds(30))
+                .connectTimeout(nodeProperties.getConnectTimeout())
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
-                .followRedirects(HttpClient.Redirect.NORMAL)
+                // Never follow redirects: the client carries a node-scoped API key
+                // that must not be replayed to another origin.
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
     }
 
     @Bean
     public RestClient nodeRestClient(RestClient.Builder builder, HttpClient generalHttpClient) {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(generalHttpClient);
+        requestFactory.setReadTimeout(nodeProperties.getReadTimeout());
         return builder
                 .baseUrl(nodeProperties.getBaseUrl())
-                .requestFactory(new JdkClientHttpRequestFactory(generalHttpClient))
+                .requestFactory(requestFactory)
+                .requestInterceptor(nodeResponseBufferingInterceptor)
                 .defaultHeader("User-Agent", "GEWallet-Client")
                 .defaultHeader("X-API-Key", nodeProperties.getApiKey())
                 .build();

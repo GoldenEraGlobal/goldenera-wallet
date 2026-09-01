@@ -1,5 +1,6 @@
+import type {
+    GetTransfersTransferTypeKey} from '@project/api'
 import {
-    GetTransfersQueryParamsTransferTypeEnumKey,
     useGetBalancesHook,
     useGetTokenByAddressHook
 } from '@project/api'
@@ -17,7 +18,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import {
     ArrowDownLeft,
     ArrowUpRight,
@@ -40,17 +41,17 @@ export interface TokenDetailPageProps {
     tokenAddress: string
 }
 
-export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ params }) => {
+export const TokenDetailPage: ActivityComponentType<'TokenDetailPage'> = ({ params }) => {
     const { push } = useFlow()
     const { copy, copied } = useCopy()
     const { tokenAddress } = params
     const address = useWalletStore((state) => state.address)
-    const [transferFilter, setTransferFilter] = useState<GetTransfersQueryParamsTransferTypeEnumKey | undefined>(undefined)
+    const [transferFilter, setTransferFilter] = useState<GetTransfersTransferTypeKey | undefined>(undefined)
     const supportedScan = useBarcodeIsSupported()
 
     // Fetch token info
     const { data: tokenInfo, refetch: refetchTokenInfo } = useGetTokenByAddressHook(
-        { address: tokenAddress },
+        { query: { address: tokenAddress } },
         {
             query: {
                 enabled: !!tokenAddress,
@@ -61,10 +62,10 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
 
     // Fetch balance for this token
     const { data: balances, isLoading: isLoadingBalance, refetch: refetchBalances } = useGetBalancesHook(
-        {
+        { query: {
             addresses: address ? [address] : [],
             tokenAddresses: [tokenAddress]
-        },
+        } },
         {
             query: {
                 enabled: !!address,
@@ -82,7 +83,7 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
     // Get token details
     const tokenName = tokenInfo?.name || 'Token'
     const tokenSymbol = tokenInfo?.smallestUnitName || 'TKN'
-    const tokenDecimals = tokenInfo?.numberOfDecimals || 8
+    const tokenDecimals = tokenInfo?.numberOfDecimals ?? 8
 
     // Get balance
     const balance = balances?.[0]?.balance || '0'
@@ -91,7 +92,7 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
         return (
             <TransferFilter filter={transferFilter} onFilterChange={setTransferFilter}>
                 {(open) => (
-                    <Button variant="ghost" size="icon" onClick={open}>
+                    <Button aria-label="Filter transfers" variant="ghost" size="icon" onClick={open}>
                         <Filter className="h-5 w-5" />
                     </Button>
                 )}

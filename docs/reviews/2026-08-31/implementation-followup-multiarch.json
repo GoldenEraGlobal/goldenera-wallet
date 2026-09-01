@@ -1,0 +1,28 @@
+{
+  "ociSha256": "a643959b1bc2c8df3714749e8940a1771a1f45d7565dca13454332d97b92bd8a",
+  "hostJarSha256": "f4b7f896c953a5929b579e3b92f83141f0eda8dcbfc5aec5e9d936e184bccb37",
+  "platforms": {
+    "amd64": {
+      "jarSha256": "f4b7f896c953a5929b579e3b92f83141f0eda8dcbfc5aec5e9d936e184bccb37",
+      "javaVersionEnv": [
+        "PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "JAVA_HOME=/opt/java/openjdk",
+        "LANG=en_US.UTF-8",
+        "LANGUAGE=en_US:en",
+        "LC_ALL=en_US.UTF-8",
+        "JAVA_VERSION=jdk-25.0.4+7"
+      ]
+    },
+    "arm64": {
+      "jarSha256": "f4b7f896c953a5929b579e3b92f83141f0eda8dcbfc5aec5e9d936e184bccb37",
+      "javaVersionEnv": [
+        "PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "JAVA_HOME=/opt/java/openjdk",
+        "LANG=en_US.UTF-8",
+        "LANGUAGE=en_US:en",
+        "LC_ALL=en_US.UTF-8",
+        "JAVA_VERSION=jdk-25.0.4+7"
+      ]
+    }
+  }
+}

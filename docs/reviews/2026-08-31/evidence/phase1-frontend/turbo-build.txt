@@ -1,0 +1,105 @@
+$ turbo run build --filter=web
+• turbo 2.10.12
+
+   • Packages in scope: web
+   • Running build in 1 packages
+   • Remote caching disabled
+
+@project/ui:build: cache miss, executing ef26a6f215b4abf8
+@project/api:build: cache miss, executing e5cb819171f69b90
+@project/api:build: $ tsup
+@project/ui:build: $ tsup
+@project/api:build: CLI Building entry: src/index.ts
+@project/api:build: CLI Using tsconfig: tsconfig.json
+@project/api:build: CLI tsup v8.5.1
+@project/api:build: CLI Using tsup config: /home/andrej/Projects/goldenera/goldenera-wallet/frontend/packages/api/tsup.config.ts
+@project/api:build: CLI Target: es2022
+@project/api:build: CLI Cleaning output folder
+@project/api:build: CJS Build start
+@project/api:build: ESM Build start
+@project/ui:build: CLI Building entry: src/index.ts
+@project/ui:build: CLI Using tsconfig: tsconfig.json
+@project/ui:build: CLI tsup v8.5.1
+@project/ui:build: CLI Using tsup config: /home/andrej/Projects/goldenera/goldenera-wallet/frontend/packages/ui/tsup.config.ts
+@project/ui:build: CLI Target: es2022
+@project/ui:build: CLI Cleaning output folder
+@project/ui:build: CJS Build start
+@project/ui:build: ESM Build start
+@project/api:build: CJS dist/index.cjs     48.97 KB
+@project/api:build: CJS dist/index.cjs.map 139.15 KB
+@project/api:build: CJS ⚡️ Build success in 30ms
+@project/api:build: ESM dist/index.js     43.01 KB
+@project/api:build: ESM dist/index.js.map 138.92 KB
+@project/api:build: ESM ⚡️ Build success in 30ms
+@project/ui:build: CJS dist/index.cjs     106.98 KB
+@project/ui:build: CJS dist/index.cjs.map 156.17 KB
+@project/ui:build: CJS ⚡️ Build success in 37ms
+@project/ui:build: ESM dist/index.js     92.57 KB
+@project/ui:build: ESM dist/index.js.map 154.79 KB
+@project/ui:build: ESM ⚡️ Build success in 37ms
+@project/api:build: DTS Build start
+@project/ui:build: DTS Build start
+@project/api:build: DTS ⚡️ Build success in 1272ms
+@project/api:build: DTS dist/index.d.cts 74.50 KB
+@project/api:build: DTS dist/index.d.ts  74.50 KB
+@project/ui:build: DTS ⚡️ Build success in 1773ms
+@project/ui:build: DTS dist/index.d.cts 25.47 KB
+@project/ui:build: DTS dist/index.d.ts  25.47 KB
+@project/core:build: cache miss, executing e8ffb0b0e81d3189
+@project/core:build: $ tsup
+@project/core:build: CLI Building entry: src/index.ts
+@project/core:build: CLI Using tsconfig: tsconfig.json
+@project/core:build: CLI tsup v8.5.1
+@project/core:build: CLI Using tsup config: /home/andrej/Projects/goldenera/goldenera-wallet/frontend/packages/core/tsup.config.ts
+@project/core:build: CLI Target: es2022
+@project/core:build: CLI Cleaning output folder
+@project/core:build: CJS Build start
+@project/core:build: ESM Build start
+@project/core:build: ESM dist/index.js     185.29 KB
+@project/core:build: ESM dist/index.js.map 342.49 KB
+@project/core:build: ESM ⚡️ Build success in 45ms
+@project/core:build: CJS dist/index.cjs     207.60 KB
+@project/core:build: CJS dist/index.cjs.map 325.74 KB
+@project/core:build: CJS ⚡️ Build success in 45ms
+web:build: cache miss, executing ae7ec323211f03a8
+web:build: $ vite build
+web:build: vite v8.2.2 building client environment for production...
+web:build: transforming...
+web:build: ✓ 3819 modules transformed.
+web:build: rendering chunks...
+web:build: computing gzip size...
+web:build: dist/manifest.webmanifest                                    0.78 kB
+web:build: dist/index.html                                              2.30 kB │ gzip:   0.80 kB
+web:build: dist/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2     10.25 kB
+web:build: dist/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2      11.23 kB
+web:build: dist/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2       18.74 kB
+web:build: dist/assets/inter-greek-wght-normal-CkhJZR-_.woff2          18.99 kB
+web:build: dist/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2   25.96 kB
+web:build: dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2          48.25 kB
+web:build: dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2      85.06 kB
+web:build: dist/assets/vendor-stackflow-arvwB_ke.css                   17.54 kB │ gzip:   2.05 kB
+web:build: dist/assets/index-C1_cRy6G.css                             105.40 kB │ gzip:  16.98 kB
+web:build: dist/assets/rolldown-runtime-hePW80VL.js                     0.71 kB │ gzip:   0.42 kB
+web:build: dist/assets/web-Dkcr9G0g.js                                  3.47 kB │ gzip:   1.14 kB
+web:build: dist/assets/workbox-window.prod.es5-Bd17z0YL.js              5.65 kB │ gzip:   2.20 kB
+web:build: dist/assets/vendor-capacitor-D2QQtAzV.js                    65.93 kB │ gzip:  19.08 kB
+web:build: dist/assets/vendor-stackflow-DkampDgn.js                    83.02 kB │ gzip:  25.19 kB
+web:build: dist/assets/vendor-crypto-BeEvCn_H.js                       96.76 kB │ gzip:  37.04 kB
+web:build: dist/assets/vendor-react-D_Rhr4js.js                       189.60 kB │ gzip:  59.60 kB
+web:build: dist/assets/vendor-utils-B_cRXfB3.js                       198.12 kB │ gzip:  62.58 kB
+web:build: dist/assets/index-CkWzt1ph.js                              290.34 kB │ gzip:  83.49 kB
+web:build: dist/assets/vendor-ui-D8bdIzbp.js                          352.02 kB │ gzip: 115.15 kB
+web:build: 
+web:build: ✓ built in 534ms
+web:build: 
+web:build: PWA v1.3.0
+web:build: mode      generateSW
+web:build: precache  33 entries (1789.51 KiB)
+web:build: files generated
+web:build:   dist/sw.js
+web:build:   dist/workbox-835c8c05.js
+
+ Tasks:    4 successful, 4 total
+Cached:    0 cached, 4 total
+  Time:    5.748s 
+

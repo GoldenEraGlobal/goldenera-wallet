@@ -1,11 +1,11 @@
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
-import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, cn, Field, FieldError, FieldLabel, PasswordInput, Spinner } from "@project/ui"
-import { Lock } from "lucide-react"
-import { ReactNode } from "react"
-import { useForm } from "react-hook-form"
-import z from "zod/v4"
-import { useWalletStore } from "../../store/WalletStore"
-import { BiometricUnlock } from "./BiometricUnlock"
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, cn, Field, FieldError, FieldLabel, PasswordInput, Spinner } from '@project/ui'
+import { Lock } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
+import { useForm } from 'react-hook-form'
+import z from 'zod/v4'
+import { useWalletStore } from '../../store/WalletStore'
+import { BiometricUnlock } from './BiometricUnlock'
 
 const unlockSchema = z.object({
     password: z.string().min(1, 'Password is required'),
@@ -25,6 +25,9 @@ export interface UnlockCardProps {
 
 export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biometric = true, btnLabel }: UnlockCardProps) => {
     const checkPassword = useWalletStore((state) => state.checkPassword)
+    const busy = useRef(false)
+    const [pending, setPending] = useState(false)
+    const setPendingAuthentication = (value: boolean) => { busy.current = value; setPending(value) }
     const form = useForm<UnlockForm>({
         resolver: standardSchemaResolver(unlockSchema),
         defaultValues: {
@@ -58,9 +61,12 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
     }
 
     const onSubmit = async (data: UnlockForm) => {
+        if (busy.current) return
+        setPendingAuthentication(true)
         try {
             const result = await checkPassword(data.password)
             if (result) {
+                await useWalletStore.getState().retireLegacyWithPassword(data.password)
                 await onSuccess({ password: data.password, mnemonic: result })
                 return
             }
@@ -77,6 +83,7 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
             onFailed?.()
         } finally {
             form.setValue('password', '')
+            setPendingAuthentication(false)
         }
     }
 
@@ -84,7 +91,7 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
 
     return (
         <form className="w-full" onSubmit={form.handleSubmit(onSubmit)}>
-            <Card className={cn("w-full")}>
+            <Card className={cn('w-full')}>
                 <CardHeader className="text-center">
                     <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 [&_svg]:size-7 [&_svg]:text-primary">
                         {icon || <Lock />}
@@ -101,6 +108,7 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
                         <FieldLabel className='sr-only'>Password</FieldLabel>
                         <PasswordInput
                             placeholder="Enter your password"
+                            disabled={pending || form.formState.isSubmitting}
                             {...form.register('password')}
                         />
                         {passwordError && <FieldError>{passwordError}</FieldError>}
@@ -111,9 +119,9 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
                         type="submit"
                         size="lg"
                         className="w-full"
-                        disabled={!form.formState.isValid || form.formState.isLoading || form.formState.disabled}
+                        disabled={!form.formState.isValid || (pending || form.formState.isSubmitting) || form.formState.disabled}
                     >
-                        {form.formState.isLoading ? (
+                        {(pending || form.formState.isSubmitting) ? (
                             <>
                                 <Spinner />
                                 Unlocking...
@@ -125,8 +133,9 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
                     {biometric && (
                         <BiometricUnlock
                             onSuccess={handleBiometricUnlock}
+                            onPendingChange={setPendingAuthentication}
                             onFailed={handleBiometricUnlockFailed}
-                            disabled={form.formState.isLoading}
+                            disabled={(pending || form.formState.isSubmitting)}
                             size="lg"
                             className="w-full"
                             variant='outline'

@@ -12,7 +12,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from '@stackflow/react'
+import type { ActivityComponentType } from '@stackflow/react'
 import {
     ChevronRight,
     Copy,
@@ -31,7 +31,7 @@ import { useWalletStore } from '../store/WalletStore'
 import { shortenAddress } from '../utils/WalletUtil'
 
 
-export const SettingsPage: ActivityComponentType = () => {
+export const SettingsPage: ActivityComponentType<'SettingsPage'> = () => {
     const { copy, copied } = useCopy()
     const { push } = useFlow()
     const lockWallet = useWalletStore((state) => state.lockWallet)

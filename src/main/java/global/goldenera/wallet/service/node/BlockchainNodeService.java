@@ -60,23 +60,23 @@ public class BlockchainNodeService {
     MempoolApiV1Api mempoolApi;
     WalletMapper walletMapper;
 
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getLatestBlockHeight() {
         return blockchainApi.getLatestBlockHeight().getBody();
     }
 
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public AccountSummaryDtoV1 getAccountSummary(Address address, Address tokenAddress) {
         return blockchainApi.getAccountSummary(address.toChecksumAddress(),
                 tokenAddress == null ? null : tokenAddress.toChecksumAddress()).getBody();
     }
 
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public RecommendedFeesDtoV1 getMempoolRecommendedFees() {
         return mempoolApi.getRecommendedFees().getBody();
     }
 
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public List<TokenDtoV1> getAllTokens() {
         Map<String, TokenStateDtoV1> tokens = blockchainApi.getAllTokens().getBody();
         List<TokenDtoV1> result = new ArrayList<>();
@@ -97,7 +97,7 @@ public class BlockchainNodeService {
         return result;
     }
 
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    // A transport timeout may occur after acceptance; never automatically resubmit signed transactions.
     public MempoolResult submitTransaction(String hexData) {
         return mempoolApi.submitTx(new MempoolSubmitTxDtoV1().rawTxDataInHex(hexData)).getBody();
     }

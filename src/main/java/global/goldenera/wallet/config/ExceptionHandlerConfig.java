@@ -31,6 +31,7 @@ import java.util.Map;
 
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
@@ -39,6 +40,7 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -47,9 +49,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DatabindException;
+import tools.jackson.databind.ObjectMapper;
 
 import global.goldenera.cryptoj.exceptions.CryptoJException;
 import global.goldenera.cryptoj.exceptions.CryptoJFailedException;
@@ -152,6 +154,13 @@ public class ExceptionHandlerConfig {
     }
 
     @ResponseBody
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    String handleMethodArgumentNotValidException(@NonNull MethodArgumentNotValidException ex) {
+        return wrapToJson(MethodArgumentNotValidException.class.getSimpleName());
+    }
+
+    @ResponseBody
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     String handleMethodArgumentTypeMismatchException(@NonNull MethodArgumentTypeMismatchException ex) {
@@ -168,11 +177,12 @@ public class ExceptionHandlerConfig {
     }
 
     @ResponseBody
-    @ExceptionHandler(JsonMappingException.class)
+    @ExceptionHandler(DatabindException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    String handleJsonMappingException(@NonNull JsonMappingException ex) {
+    String handleDatabindException(@NonNull DatabindException ex) {
         log.error("JSON mapping exception: {}", ex.getMessage(), ex);
-        return wrapToJson(JsonMappingException.class.getSimpleName());
+        // Preserve the public error identifier used before the Jackson 3 migration.
+        return wrapToJson("JsonMappingException");
     }
 
     @ResponseBody
@@ -255,6 +265,14 @@ public class ExceptionHandlerConfig {
     }
 
     @ResponseBody
+    @ExceptionHandler(ResourceAccessException.class)
+    @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
+    String handleNodeTransportException(ResourceAccessException ex) {
+        log.warn("Node request did not complete: {}", ex.getClass().getSimpleName());
+        return wrapToJson("Node request did not complete. A submitted transaction may already have been accepted; check its status before retrying.");
+    }
+
+    @ResponseBody
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     String handleException(@NonNull Exception ex) {
@@ -281,7 +299,7 @@ public class ExceptionHandlerConfig {
         try {
             return objectMapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(Map.of("message", message, "details", details));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return fallback;
         }
     }

@@ -32,26 +32,26 @@ export const CryptoUtil = {
    * Encrypts a string using a Password-derived key.
    */
   async encrypt(data: string, password: string): Promise<string> {
-    const salt = window.crypto.getRandomValues(new Uint8Array(16));
-    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const salt = window.crypto.getRandomValues(new Uint8Array(16))
+    const iv = window.crypto.getRandomValues(new Uint8Array(12))
 
-    const derivedKey = await this.deriveKeyFromPassword(password, salt);
-    const encodedData = new TextEncoder().encode(data);
+    const derivedKey = await this.deriveKeyFromPassword(password, salt)
+    const encodedData = new TextEncoder().encode(data)
 
     const encryptedContent = await window.crypto.subtle.encrypt(
       { name: this.ALGO_AES, iv },
       derivedKey,
       encodedData
-    );
+    )
 
     const payload = {
       v: 1, // version for future migrations
       iv: bufferToHex(iv),
       salt: bufferToHex(salt),
       data: bufferToHex(encryptedContent),
-    };
+    }
 
-    return JSON.stringify(payload);
+    return JSON.stringify(payload)
   },
 
   /**
@@ -59,25 +59,25 @@ export const CryptoUtil = {
    */
   async decrypt(encryptedData: string, password: string): Promise<string | null> {
     try {
-      const payload = JSON.parse(encryptedData);
-      if (!payload.iv || !payload.salt || !payload.data) return null;
+      const payload = JSON.parse(encryptedData)
+      if (!payload.iv || !payload.salt || !payload.data) return null
 
-      const salt = hexToBuffer(payload.salt);
-      const iv = hexToBuffer(payload.iv);
-      const data = hexToBuffer(payload.data);
+      const salt = hexToBuffer(payload.salt)
+      const iv = hexToBuffer(payload.iv)
+      const data = hexToBuffer(payload.data)
 
-      const derivedKey = await this.deriveKeyFromPassword(password, salt);
+      const derivedKey = await this.deriveKeyFromPassword(password, salt)
 
       const decryptedBuffer = await window.crypto.subtle.decrypt(
         { name: this.ALGO_AES, iv: iv as BufferSource },
         derivedKey,
         data as BufferSource
-      );
+      )
 
-      return new TextDecoder().decode(decryptedBuffer);
+      return new TextDecoder().decode(decryptedBuffer)
     } catch (error) {
-      console.error('Decryption failed:', error);
-      return null;
+      console.error('Decryption failed:', error)
+      return null
     }
   },
 
@@ -85,14 +85,14 @@ export const CryptoUtil = {
    * Private helper to derive a key from a Password using PBKDF2.
    */
   async deriveKeyFromPassword(password: string, salt: Uint8Array): Promise<CryptoKey> {
-    const encoder = new TextEncoder();
+    const encoder = new TextEncoder()
     const keyMaterial = await window.crypto.subtle.importKey(
       'raw',
       encoder.encode(password),
       { name: this.ALGO_KDF },
       false,
       ['deriveKey']
-    );
+    )
 
     return window.crypto.subtle.deriveKey(
       {
@@ -105,6 +105,6 @@ export const CryptoUtil = {
       { name: this.ALGO_AES, length: this.KEY_LENGTH },
       false,
       ['encrypt', 'decrypt']
-    );
+    )
   }
-};
+}

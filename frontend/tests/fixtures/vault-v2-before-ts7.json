@@ -1,0 +1,14 @@
+{
+  "warning": "PUBLIC test wallet, captured from the previous approved production build. Never fund this key.",
+  "password": "PUBLIC-TEST-ONLY_password-123!",
+  "address": "0x9858effd232b4033e47d90003d41ec34ecaeda94",
+  "record": {
+    "version": 2,
+    "id": "002903ee-68b5-483d-82ff-f5f6738d7105",
+    "revision": 0,
+    "address": "0x9858effd232b4033e47d90003d41ec34ecaeda94",
+    "encryptedMnemonic": "{\"v\":1,\"iv\":\"88ca8fed10bdd412d6632164\",\"salt\":\"7a33d5dbff7b6016b9f5004a03bd4456\",\"data\":\"d9f015bf6899d51ac07bf30534b6a09308f1624dffdb376303daa9994cb59719fe57c231ed077eef0452813384ab1cdc5a5b296dbef7bd8dae2d619e12a0388da3d0ced87ca03a63db820368d138abbb4dbfaeb069b7379d072768f43f6e1844bbe92157f1dd55ec51b61dad31\"}",
+    "backedUp": true
+  },
+  "sourceArtifactTreeSha256": "ac67115c8ee074694da1896130c7a0c9445c449ac5aecc92017fdab131494abf"
+}

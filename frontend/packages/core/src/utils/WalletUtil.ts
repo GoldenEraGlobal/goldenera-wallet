@@ -1,9 +1,18 @@
-import { Address, NATIVE_TOKEN, PrivateKey, ZERO_ADDRESS } from '@goldenera/cryptoj'
+import type { Address} from '@goldenera/cryptoj'
+import { NATIVE_TOKEN, PrivateKey, ZERO_ADDRESS } from '@goldenera/cryptoj'
 
 export interface WalletData {
   mnemonic: string
   address: string
   privateKey: PrivateKey
+}
+
+function assertValidMnemonic(mnemonic: string): void {
+  // CryptoJ 0.5 aligns fromMnemonic with Java's raw UTF-8 seed derivation
+  // and therefore no longer performs BIP-39 checksum validation itself.
+  if (!PrivateKey.isValidMnemonic(mnemonic)) {
+    throw new Error('Invalid mnemonic phrase')
+  }
 }
 
 /**
@@ -28,6 +37,7 @@ export const WalletUtil = {
    * Restores a wallet from an existing mnemonic.
    */
   restoreFromMnemonic(mnemonic: string): WalletData {
+    assertValidMnemonic(mnemonic)
     const privateKey = PrivateKey.fromMnemonic(mnemonic, undefined, 0)
     return {
       mnemonic,
@@ -41,7 +51,7 @@ export const WalletUtil = {
    */
   isValidMnemonic(mnemonic: string): boolean {
     try {
-      PrivateKey.fromMnemonic(mnemonic, undefined, 0)
+      assertValidMnemonic(mnemonic)
       return true
     } catch {
       return false
@@ -57,12 +67,16 @@ export const shortenAddress = (address: string): string => {
 export const formatWei = (weiStr: string | undefined, decimals: number = 8): string => {
   if (!weiStr) return '0'
   try {
-    const wei = BigInt(weiStr)
-    const divisor = BigInt(10 ** decimals)
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) return '0'
+    const value = BigInt(weiStr)
+    const negative = value < 0n
+    const wei = negative ? -value : value
+    const divisor = 10n ** BigInt(decimals)
     const whole = wei / divisor
-    const fraction = wei % divisor
-    const fractionStr = fraction.toString().padStart(decimals, '0')
-    return `${whole.toLocaleString()}.${fractionStr}`
+    const prefix = negative ? '-' : ''
+    if (decimals === 0) return `${prefix}${whole.toLocaleString()}`
+    const fractionStr = (wei % divisor).toString().padStart(decimals, '0')
+    return `${prefix}${whole.toLocaleString()}.${fractionStr}`
   } catch {
     return '0'
   }
@@ -87,7 +101,7 @@ export const isZeroAddress = (address?: string | null | Address): boolean => {
 
 export const compareAddress = (address?: string | null | Address, otherAddress?: string | null | Address): boolean => {
   if (typeof address !== 'string' || typeof otherAddress !== 'string') {
-    return false;
+    return false
   }
   return address.toLowerCase().trim() === otherAddress.toLowerCase().trim()
 }

@@ -1,254 +1,186 @@
-import {
-    BarcodeFormat,
-    BarcodeScanner,
-    LensFacing,
-    type BarcodesScannedEvent
-} from '@capacitor-mlkit/barcode-scanning';
-import { Capacitor } from '@capacitor/core';
-import { Button, Spinner } from '@project/ui';
-import { Flashlight, FlashlightOff, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppLayout } from '../layouts/Layouts';
-import { useFlow } from '../router/useFlow';
-import { stringToQrData } from '../utils/QrUtil';
+import { BarcodeFormat, BarcodeScanner, LensFacing } from '@capacitor-mlkit/barcode-scanning'
+import { Capacitor } from '@capacitor/core'
+import type { PluginListenerHandle } from '@capacitor/core'
+import { Button, Spinner } from '@project/ui'
+import { Flashlight, FlashlightOff, XIcon } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AppLayout } from '../layouts/Layouts'
+import { useFlow } from '../router/useFlow'
+import { stringToQrData } from '../utils/QrUtil'
 
-const isNative = Capacitor.isNativePlatform();
-
-// Helper to toggle body classes for scanner transparency
+const isNative = Capacitor.isNativePlatform()
 const setScannerActive = (active: boolean) => {
-    if (active) {
-        document.documentElement.classList.add('barcode-scanner-active');
-        document.body.classList.add('barcode-scanner-active');
-    } else {
-        document.documentElement.classList.remove('barcode-scanner-active');
-        document.body.classList.remove('barcode-scanner-active');
-    }
-};
+    document.documentElement.classList.toggle('barcode-scanner-active', active)
+    document.body.classList.toggle('barcode-scanner-active', active)
+}
+
+// The plugin owns one camera globally. Serialize late permission/start responses
+// with teardown so leaving and reopening the page cannot revive an old scan.
+let scannerLifecycle: Promise<void> = Promise.resolve()
+const serializeScanner = (operation: () => Promise<void>) => {
+    const result = scannerLifecycle.then(operation, operation)
+    scannerLifecycle = result.catch(() => undefined)
+    return result
+}
 
 export const ScanQrCodePage = () => {
-    const { pop, replace } = useFlow();
+    const { pop, replace } = useFlow()
+    const [isScanning, setIsScanning] = useState(false)
+    const [torchEnabled, setTorchEnabled] = useState(false)
+    const [torchAvailable, setTorchAvailable] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const listenerRef = useRef<PluginListenerHandle | null>(null)
+    const mounted = useRef(false)
+    const generation = useRef(0)
+    const hasNavigated = useRef(false)
 
-    const [isScanning, setIsScanning] = useState(false);
-    const [torchEnabled, setTorchEnabled] = useState(false);
-    const [torchAvailable, setTorchAvailable] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const isMounted = useRef(false);
-    const didInit = useRef(false); // Prevents double init in Strict Mode
-    const isRequestingPermission = useRef(false);
-    const hasNavigated = useRef(false); // Prevent double navigation
-
-    const stopScan = useCallback(async () => {
-        setScannerActive(false);
-        try {
-            await BarcodeScanner.removeAllListeners();
-            await BarcodeScanner.stopScan();
-            if (isNative) {
-                try { await BarcodeScanner.disableTorch(); } catch { }
-            }
-        } catch (e) {
-            console.warn('Cleanup error:', e);
-        }
-        didInit.current = false;
-    }, []);
+    const stopScan = useCallback(() => {
+        generation.current++
+        setScannerActive(false)
+        const stream = videoRef.current?.srcObject as MediaStream | null
+        stream?.getTracks().forEach(track => track.stop())
+        if (videoRef.current) videoRef.current.srcObject = null
+        return serializeScanner(async () => {
+            const listener = listenerRef.current
+            listenerRef.current = null
+            // Do not remove listeners belonging to another component.
+            await Promise.allSettled([
+                listener?.remove(),
+                BarcodeScanner.stopScan(),
+                ...(isNative ? [BarcodeScanner.disableTorch()] : []),
+            ])
+        })
+    }, [])
 
     const onScan = useCallback((data: string) => {
-        // Prevent double navigation from multiple scans
-        if (hasNavigated.current) return;
-        hasNavigated.current = true;
+        if (!mounted.current || hasNavigated.current) return
+        let qrData
+        try {
+            qrData = stringToQrData(data)
+        } catch {
+            setError('This is not a valid wallet QR code. Scan another code or go back.')
+            return
+        }
+        // Validation must succeed before claiming this page's single navigation.
+        hasNavigated.current = true
+        void stopScan()
+        replace('TxSubmitPage', { data: { recipient: qrData.address, amount: qrData.amount, tokenAddress: qrData.tokenAddress } })
+    }, [replace, stopScan])
 
-        const qrData = stringToQrData(data)
-        // Stop scan in background - don't await to avoid blocking navigation
-        stopScan()
-        // Use replace to remove ScanQrCodePage from stack - when user pops from TxSubmitPage, they go to TokenDetailPage
-        replace('TxSubmitPage', {
-            data: {
-                recipient: qrData.address,
-                amount: qrData.amount,
-                tokenAddress: qrData.tokenAddress
+    const initScanner = useCallback(() => {
+        const currentGeneration = generation.current
+        const isCurrent = () => mounted.current && !hasNavigated.current && currentGeneration === generation.current
+        return serializeScanner(async () => {
+            if (!isCurrent()) return
+            setIsLoading(true)
+            setError(null)
+            try {
+                const { supported } = await BarcodeScanner.isSupported()
+                if (!isCurrent()) return
+                if (!supported) throw new Error('Scanner not supported on this device.')
+                let permission = await BarcodeScanner.checkPermissions()
+                if (!isCurrent()) return
+                if (permission.camera !== 'granted') permission = await BarcodeScanner.requestPermissions()
+                if (!isCurrent()) return
+                if (permission.camera !== 'granted') throw new Error('Camera permission denied.')
+                const listener = await BarcodeScanner.addListener('barcodesScanned', event => {
+                    const value = event.barcodes[0]?.displayValue
+                    if (value && isCurrent()) onScan(value)
+                })
+                listenerRef.current = listener
+                if (!isCurrent()) { await listener.remove(); listenerRef.current = null; return }
+                setScannerActive(true)
+                await BarcodeScanner.startScan({
+                    formats: [BarcodeFormat.QrCode],
+                    lensFacing: LensFacing.Back,
+                    videoElement: !isNative && videoRef.current ? videoRef.current : undefined,
+                })
+                if (!isCurrent()) return // queued teardown runs immediately after this task
+                if (isNative) {
+                    const { available } = await BarcodeScanner.isTorchAvailable()
+                    if (isCurrent()) setTorchAvailable(available)
+                } else {
+                    const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0]
+                    const capabilities = track?.getCapabilities() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
+                    setTorchAvailable(!!capabilities?.torch)
+                }
+                if (isCurrent()) setIsScanning(true)
+            } catch (failure) {
+                await listenerRef.current?.remove().catch(() => undefined)
+                listenerRef.current = null
+                await BarcodeScanner.stopScan().catch(() => undefined)
+                if (isCurrent()) {
+                    setScannerActive(false)
+                    setError(failure instanceof Error ? failure.message : 'Failed to start camera.')
+                    setIsScanning(false)
+                }
+            } finally {
+                if (isCurrent()) setIsLoading(false)
             }
         })
-    }, [replace, stopScan]);
-
-    const initScanner = useCallback(async () => {
-        if (didInit.current || isRequestingPermission.current) return;
-        didInit.current = true;
-
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            const { supported } = await BarcodeScanner.isSupported();
-            if (!supported) throw new Error('Scanner not supported on this device.');
-
-            let status = await BarcodeScanner.checkPermissions();
-            if (status.camera !== 'granted') {
-                isRequestingPermission.current = true;
-                try {
-                    status = await BarcodeScanner.requestPermissions();
-                } finally {
-                    isRequestingPermission.current = false;
-                }
-            }
-            if (status.camera !== 'granted') throw new Error('Camera permission denied.');
-
-            await BarcodeScanner.addListener('barcodesScanned', async (event: BarcodesScannedEvent) => {
-                const barcode = event.barcodes[0];
-                if (barcode && isMounted.current) {
-                    if (!barcode.displayValue) return;
-                    await onScan(barcode.displayValue)
-                }
-            });
-
-            setScannerActive(true);
-
-            await BarcodeScanner.startScan({
-                formats: [BarcodeFormat.QrCode],
-                lensFacing: LensFacing.Back,
-                videoElement: (!isNative && videoRef.current) ? videoRef.current : undefined
-            });
-
-            if (isNative) {
-                const { available } = await BarcodeScanner.isTorchAvailable();
-                if (isMounted.current) setTorchAvailable(available);
-            } else if (videoRef.current) {
-                // Web stream takes a moment to load capabilities
-                await new Promise((resolve) => setTimeout(resolve, 150));
-                if (!isMounted.current) return;
-                try {
-                    const track = (videoRef.current?.srcObject as MediaStream)?.getVideoTracks()[0];
-                    const caps = track?.getCapabilities() as any;
-                    setTorchAvailable(!!caps?.torch);
-                } catch (e) {
-                    console.log('Torch check failed', e);
-                }
-            }
-
-            if (isMounted.current) {
-                setIsScanning(true);
-                setIsLoading(false);
-            }
-
-        } catch (e: any) {
-            console.error('Start scan error:', e);
-            if (isMounted.current) {
-                setScannerActive(false);
-                setError(e.message || 'Failed to start camera.');
-                setIsLoading(false);
-            }
-        }
-    }, [pop, stopScan]);
-
-    const toggleTorch = async () => {
-        if (!isMounted.current) return;
-
-        const nextState = !torchEnabled;
-
-        if (isNative) {
-            await BarcodeScanner.toggleTorch();
-            if (isMounted.current) setTorchEnabled(nextState);
-        } else {
-            const video = videoRef.current;
-            if (video && video.srcObject) {
-                const track = (video.srcObject as MediaStream).getVideoTracks()[0];
-                try {
-                    await track.applyConstraints({
-                        advanced: [{ torch: nextState } as any]
-                    });
-                    if (isMounted.current) setTorchEnabled(nextState);
-                } catch (e) {
-                    console.error('Web torch error', e);
-                }
-            }
-        }
-    };
+    }, [onScan])
 
     useEffect(() => {
-        isMounted.current = true;
-
-        // Delay start by 250ms for smoother transition
-        const timer = setTimeout(() => {
-            if (isMounted.current) {
-                initScanner();
-            }
-        }, 300);
-
+        mounted.current = true
+        const timer = setTimeout(() => { void initScanner() }, 300)
         return () => {
-            isMounted.current = false;
-            clearTimeout(timer);
-            stopScan();
-        };
-    }, []);
+            mounted.current = false
+            clearTimeout(timer)
+            void stopScan()
+        }
+    }, [initScanner, stopScan])
 
     const onCancel = () => {
-        // Prevent double navigation
-        if (hasNavigated.current) return;
-        hasNavigated.current = true;
-
-        // Pop first, then cleanup in background
+        if (hasNavigated.current) return
+        hasNavigated.current = true
+        void stopScan()
         pop()
-        stopScan()
+    }
+
+    const toggleTorch = async () => {
+        if (!mounted.current) return
+        const next = !torchEnabled
+        try {
+            if (isNative) await BarcodeScanner.toggleTorch()
+            else {
+                const track = (videoRef.current?.srcObject as MediaStream | null)?.getVideoTracks()[0]
+                await track?.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
+            }
+            if (mounted.current) setTorchEnabled(next)
+        } catch { if (mounted.current) setError('Could not change the camera light.') }
     }
 
     return (
-        <AppLayout title="Scan QR Code" transparent={isNative && isScanning} swipeBack={false} padding={false} backButton={{
-            onClick: onCancel
-        }}>
-            <div className='h-full w-full relative overflow-hidden'>
-                {!isNative && (
-                    <div className="absolute inset-0 z-0">
-                        <video
-                            ref={videoRef}
-                            className="w-full h-full object-cover"
-                            playsInline
-                            muted
-                            autoPlay
-                        />
-                    </div>
-                )}
-
+        <AppLayout title="Scan QR Code" transparent={isNative && isScanning} swipeBack={false} padding={false} backButton={{ onClick: onCancel }}>
+            <div className="h-full w-full relative overflow-hidden">
+                {!isNative && <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay />}
                 <div className="relative z-10 w-full h-full pointer-events-none">
-                    {isLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <Spinner className='size-10' />
-                        </div>
-                    )}
-
+                    {isLoading && <div className="absolute inset-0 flex items-center justify-center"><Spinner className="size-10" /></div>}
                     {error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 pointer-events-auto">
-                            <p className="text-white text-center mb-4">{error}</p>
-                            <Button onClick={() => pop()} variant="white">Back</Button>
+                            <p role="alert" className="text-white text-center mb-4">{error}</p>
+                            {isScanning && <Button onClick={() => setError(null)} variant="white">Continue scanning</Button>}
+                            <Button onClick={onCancel} variant="white">Back</Button>
                         </div>
                     )}
-
                     {isScanning && !isLoading && !error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <div className="relative w-64 h-64 border-2 border-white/30 rounded-lg">
-                                <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-lg" />
-                                <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-lg" />
-                                <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-lg" />
-                                <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-lg" />
-                            </div>
-                            <p className="text-white/80 mt-8 font-medium">
-                                Position the camera over the QR code
-                            </p>
+                            <div className="w-64 h-64 border-2 border-white/30 rounded-lg" />
+                            <p className="text-white/80 mt-8 font-medium">Position the camera over the QR code</p>
                         </div>
                     )}
-
                     {isScanning && (
                         <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-4 pointer-events-auto">
-                            <Button size='icon-xl' variant="white" onClick={toggleTorch} style={{ display: torchAvailable ? 'flex' : 'none' }}>
+                            <Button aria-label="Toggle camera light" size="icon-xl" variant="white" onClick={toggleTorch} style={{ display: torchAvailable ? 'flex' : 'none' }}>
                                 {torchEnabled ? <FlashlightOff /> : <Flashlight />}
                             </Button>
-                            <Button size='icon-xl' variant="white" onClick={onCancel}>
-                                <XIcon />
-                            </Button>
+                            <Button aria-label="Cancel scanning" size="icon-xl" variant="white" onClick={onCancel}><XIcon /></Button>
                         </div>
                     )}
                 </div>
             </div>
         </AppLayout>
-    );
-};
+    )
+}

@@ -18,34 +18,34 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit",
-    "generate": "kubb generate"
+    "typecheck": "node ../../scripts/typecheck.mjs --noEmit -p tsconfig.json",
+    "generate": "KUBB_DISABLE_TELEMETRY=1 kubb generate"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@11.24.0",
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@tanstack/react-query": "^5.90"
   },
   "dependencies": {
-    "axios": "^1.13.4",
-    "zod": "^4.3.6"
+    "axios": "^1.20.0"
   },
   "devDependencies": {
-    "@kubb/cli": "^4.20.0",
-    "@kubb/core": "^4.20.0",
-    "@kubb/plugin-oas": "^4.20.0",
-    "@kubb/plugin-react-query": "^4.20.0",
-    "@kubb/plugin-ts": "^4.20.0",
-    "@tanstack/react-query": "^5.90.20",
-    "@types/react": "^19.2.10",
-    "@types/react-dom": "^19.2.3",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "@kubb/adapter-oas": "^5.0.5",
+    "@kubb/plugin-axios": "^5.1.1",
+    "@kubb/plugin-react-query": "^5.0.1",
+    "@kubb/plugin-ts": "^5.0.0",
+    "@tanstack/react-query": "^5.102.8",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "kubb": "^5.0.5",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "@typescript/native": "npm:typescript@7.0.2"
   }
 }

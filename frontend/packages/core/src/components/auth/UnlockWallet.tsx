@@ -1,5 +1,5 @@
-import { useWalletStore } from "../../store/WalletStore"
-import { UnlockCard } from "./UnlockCard"
+import { useWalletStore } from '../../store/WalletStore'
+import { UnlockCard } from './UnlockCard'
 
 export const UnlockWallet = () => {
     const unlockWallet = useWalletStore((state) => state.unlockWallet)

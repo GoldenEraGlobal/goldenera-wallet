@@ -1,6 +1,6 @@
-import { Button } from "@project/ui";
-import { Eye } from "lucide-react";
-import { useUncontrolledProp } from 'uncontrollable';
+import { Button } from '@project/ui'
+import { Eye } from 'lucide-react'
+import { useUncontrolledProp } from 'uncontrollable'
 
 export interface MnemonicGridProps {
     mnemonic: string;

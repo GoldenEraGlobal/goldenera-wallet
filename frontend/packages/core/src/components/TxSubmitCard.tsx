@@ -1,6 +1,7 @@
-import { Amounts, bytesToHex, DECIMALS, encodeTx, Network, TxBuilder, TxType, ZERO_ADDRESS, type Address } from '@goldenera/cryptoj'
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
-import { TokenDtoV1, useGetBalancesHook, useGetMempoolRecommendedFeesHook, useGetNextNonceHook, useGetTokensHook, useSubmitTransactionHook, type MempoolRecommendedFeesDtoV1, type MempoolRecommendedFeesLevelDtoV1 } from "@project/api"
+import { ZERO_ADDRESS } from '@goldenera/cryptoj'
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
+import type { TokenDtoV1} from '@project/api'
+import { useGetBalancesHook, useGetMempoolRecommendedFeesHook, getBalances, getNextNonce, submitTransaction, useGetTokensHook, type MempoolRecommendedFeesDtoV1, type MempoolRecommendedFeesLevelDtoV1 } from '@project/api'
 import {
     Alert,
     AlertDescription,
@@ -30,24 +31,25 @@ import {
     SelectTrigger,
     SelectValue,
     Spinner
-} from "@project/ui"
-import { Send, TriangleAlertIcon, X } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
-import { NumericFormat } from "react-number-format"
-import z from "zod/v4"
+} from '@project/ui'
+import { Send, TriangleAlertIcon, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { NumericFormat } from 'react-number-format'
+import z from 'zod/v4'
 import { useFlow } from '../router/useFlow'
-import { useWalletStore } from "../store/WalletStore"
-import { compareAddress, formatWei, isNativeToken, isZeroAddress, shortenAddress } from "../utils/WalletUtil"
+import { useWalletStore } from '../store/WalletStore'
+import type { WalletSessionSnapshot } from '../store/WalletStore'
+import { parseTokenAmount } from '../utils/TokenAmount'
+import { TransferSubmission, assertTransferBalance, SubmissionCancelledError } from '../utils/TransferSubmission'
+import { compareAddress, formatWei, isNativeToken, isZeroAddress, shortenAddress } from '../utils/WalletUtil'
 import { DataRow } from './DataRow'
 import { TokenSelect } from './TokenSelect'
 
 const txSubmitSchema = z.object({
     tokenAddress: z.string().min(1, 'Please select a token'),
     recipient: z.string().min(42, 'Invalid address').max(42, 'Invalid address').regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address format'),
-    amount: z.string().min(1, 'Amount is required').refine((value) => {
-        return Amounts.isPositive(Amounts.parseTokens(value))
-    }, 'Amount must be greater than 0'),
+    amount: z.string().min(1, 'Amount is required'),
     fee: z.enum(['fast', 'standard', 'slow']).default('standard')
 })
 
@@ -116,21 +118,24 @@ function calculateFee(
 }
 
 export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardProps) => {
-    const { replace, pop } = useFlow()
+    const { pop } = useFlow()
     const address = useWalletStore(state => state.address)
-    const privateKey = useWalletStore(state => state._privateKey)
-    const { mutateAsync: submitTx, isPending: isSubmitting } = useSubmitTransactionHook()
-    const { data: nextNonce, refetch: refetchNextNonce } = useGetNextNonceHook(
-        { address: address! },
-        { query: { enabled: !!address } }
-    )
     const { data: recommendedFees } = useGetMempoolRecommendedFeesHook()
 
     // Fetch available tokens
     const { data: tokensData, isLoading: isLoadingTokens } = useGetTokensHook()
 
-    const form = useForm<TxSubmitForm>({
-        resolver: standardSchemaResolver(txSubmitSchema),
+    const amountSchema = useMemo(() => txSubmitSchema.superRefine((data, context) => {
+        const token = tokensData?.find(item => compareAddress(item.address, data.tokenAddress))
+        try {
+            parseTokenAmount(data.amount, token?.numberOfDecimals)
+        } catch (error) {
+            context.addIssue({ code: 'custom', path: ['amount'], message: error instanceof Error ? error.message : 'Invalid amount' })
+        }
+    }), [tokensData])
+
+    const form = useForm<z.input<typeof txSubmitSchema>, unknown, TxSubmitForm>({
+        resolver: standardSchemaResolver(amountSchema),
         defaultValues: {
             tokenAddress: '',
             recipient: '',
@@ -144,11 +149,11 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
     const selectedTokenAddress = form.watch('tokenAddress')
 
     // Fetch balance for selected token
-    const { data: balanceData, refetch: refetchBalances } = useGetBalancesHook(
-        {
+    const { data: balanceData } = useGetBalancesHook(
+        { query: {
             addresses: [address!],
             tokenAddresses: selectedTokenAddress.length > 0 ? [selectedTokenAddress, ZERO_ADDRESS] : [ZERO_ADDRESS]
-        },
+        } },
         {
             query: {
                 enabled: !!address
@@ -181,199 +186,143 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
         return getBalanceFromData(balanceData, selectedTokenAddress)
     }, [balanceData, selectedTokenAddress, getBalanceFromData])
 
-    const [reviewData, setReviewData] = useState<TxSubmitForm | null>(null)
+    interface Review {
+        data: TxSubmitForm
+        token: TokenDtoV1
+        nativeToken: TokenDtoV1
+        fee: bigint
+        snapshot: WalletSessionSnapshot
+        operation: TransferSubmission
+    }
+    const [review, setReview] = useState<Review | null>(null)
+    const reviewRef = useRef<Review | null>(null)
+    const preparationRef = useRef<AbortController | null>(null)
+    const mounted = useRef(true)
+    const [isPreparingReview, setIsPreparingReview] = useState(false)
+    const [isConfirming, setIsConfirming] = useState(false)
+    const [postStarted, setPostStarted] = useState(false)
     const [submitError, setSubmitError] = useState<Error | null>(null)
+    const reviewData = review?.data ?? null
 
-    const calcFee = useCallback((type: FeeType) => {
-        return calculateFee(recommendedFees, type)
-    }, [recommendedFees])
+    const invalidateReview = useCallback(() => {
+        preparationRef.current?.abort()
+        preparationRef.current = null
+        reviewRef.current?.operation.cancel()
+        reviewRef.current = null
+        if (mounted.current) {
+            setReview(null)
+            setIsPreparingReview(false)
+            setIsConfirming(false)
+            setPostStarted(false)
+            setSubmitError(null)
+        }
+    }, [])
+
+    useEffect(() => {
+        mounted.current = true
+        const unsubscribe = useWalletStore.subscribe((state, previous) => {
+            if (state.sessionRevision !== previous.sessionRevision || state.status !== 'unlocked') invalidateReview()
+        })
+        return () => {
+            mounted.current = false
+            unsubscribe()
+            invalidateReview()
+        }
+    }, [invalidateReview])
+
+    const calcFee = useCallback((type: FeeType) => calculateFee(recommendedFees, type), [recommendedFees])
 
     const onFormSubmit = async (data: TxSubmitForm) => {
+        if (preparationRef.current || reviewRef.current) return
+        const controller = new AbortController()
+        preparationRef.current = controller
+        const snapshot = useWalletStore.getState().getSessionSnapshot()
+        setIsPreparingReview(true)
         setSubmitError(null)
-        let isError = false
-
-        const nonce = await refetchNextNonce()
-        const balances = await refetchBalances()
-
-        // Parse amount using the correct decimals and compare as BigInt
-        if (typeof nonce.data === 'undefined' || nonce.data === null || !!nonce.error) {
-            form.setError('amount', {
-                type: 'manual',
-                message: 'Failed to fetch nonce',
+        form.clearErrors('root')
+        try {
+            if (!snapshot) throw new SubmissionCancelledError()
+            const token = tokens.find(item => compareAddress(item.address, data.tokenAddress))
+            if (!token || !nativeToken) throw new Error('Token details are not loaded yet')
+            const transfer = {
+                recipient: data.recipient,
+                tokenAddress: data.tokenAddress,
+                amount: parseTokenAmount(data.amount, token.numberOfDecimals),
+                fee: calculateFee(recommendedFees, data.fee),
+            }
+            if (!recommendedFees?.[data.fee] || transfer.fee < 0n) throw new Error('Could not fetch recommended fees')
+            if (token.userBurnable === false && isZeroAddress(data.recipient)) throw new Error('Token is not burnable')
+            if (compareAddress(data.recipient, snapshot.address)) throw new Error('Cannot send to self')
+            const balances = await getBalances({ query: { addresses: [snapshot.address], tokenAddresses: [data.tokenAddress, ZERO_ADDRESS] }, signal: controller.signal })
+            if (controller.signal.aborted || !useWalletStore.getState().isSessionCurrent(snapshot)) throw new SubmissionCancelledError()
+            assertTransferBalance(transfer, balances.data)
+            const operation = new TransferSubmission(transfer, {
+                isSessionCurrent: () => useWalletStore.getState().isSessionCurrent(snapshot),
+                getPrivateKey: () => useWalletStore.getState().getPrivateKey(),
+                fetchNonce: async signal => (await getNextNonce({ query: { address: snapshot.address }, signal })).data,
+                fetchBalances: async signal => (await getBalances({ query: { addresses: [snapshot.address], tokenAddresses: [data.tokenAddress, ZERO_ADDRESS] }, signal })).data,
+                send: async (hexData, signal) => {
+                    if (mounted.current) setPostStarted(true)
+                    return (await submitTransaction({ body: { hexData }, signal })).data
+                },
             })
-            isError = true
-        }
-
-        const feeData = recommendedFees?.[data.fee]
-        if (!feeData) {
-            throw new Error('Could not fetch recommended fees')
-        }
-
-        // Use freshly fetched balance data for validation
-        const liveTokenBalance = getBalanceFromData(balances.data, data.tokenAddress)
-        const liveNativeBalance = getBalanceFromData(balances.data, ZERO_ADDRESS)
-
-        const feeWei = Amounts.wei(calculateFee(recommendedFees, data.fee))
-        const amountWei = Amounts.parseWithDecimals(data.amount, tokenDecimals)
-        const tokenBalanceWei = BigInt(liveTokenBalance?.balance ?? '0')
-        const nativeBalanceWei = BigInt(liveNativeBalance?.balance ?? '0')
-
-        if (isNativeToken(data.tokenAddress)) {
-            // For native token: amount + fee must not exceed native balance
-            const totalRequired = amountWei + feeWei
-            if (totalRequired > nativeBalanceWei) {
-                // Determine which is the issue - amount, fee, or both
-                if (amountWei > nativeBalanceWei) {
-                    // Amount alone exceeds balance
-                    form.setError('amount', {
-                        type: 'manual',
-                        message: 'Insufficient balance',
-                    })
-                } else {
-                    // Amount is ok, but amount + fee exceeds balance
-                    form.setError('amount', {
-                        type: 'manual',
-                        message: 'Insufficient balance for amount + fee',
-                    })
-                }
-                isError = true
+            const nextReview: Review = { data: { ...data }, token: { ...token }, nativeToken: { ...nativeToken }, fee: transfer.fee, snapshot, operation }
+            if (!mounted.current || preparationRef.current !== controller) { operation.cancel(); return }
+            reviewRef.current = nextReview
+            setReview(nextReview)
+            setPostStarted(false)
+        } catch (error) {
+            if (!controller.signal.aborted && mounted.current && useWalletStore.getState().isSessionCurrent(snapshot)) {
+                form.setError('root', { message: error instanceof Error ? error.message : 'Could not prepare transaction' })
             }
-        } else {
-            // For other tokens: check token balance for amount, native balance for fee
-
-            // Check if we have enough of the token for the amount
-            if (amountWei > tokenBalanceWei) {
-                form.setError('amount', {
-                    type: 'manual',
-                    message: 'Insufficient token balance',
-                })
-                isError = true
-            }
-
-            // Check if we have enough native token for the fee
-            if (feeWei > nativeBalanceWei) {
-                form.setError('fee', {
-                    type: 'manual',
-                    message: `Insufficient ${nativeTokenSymbol} for fee`,
-                })
-                isError = true
+        } finally {
+            if (preparationRef.current === controller) {
+                preparationRef.current = null
+                if (mounted.current) setIsPreparingReview(false)
             }
         }
-
-        if (selectedToken?.userBurnable === false && isZeroAddress(data.recipient)) {
-            form.setError('recipient', {
-                type: 'manual',
-                message: 'Token is not burnable',
-            })
-            isError = true
-        }
-
-        if (compareAddress(data.recipient, address)) {
-            form.setError('recipient', {
-                type: 'manual',
-                message: 'Cannot send to self',
-            })
-            isError = true
-        }
-
-        if (isError) {
-            return
-        }
-
-        setReviewData(data)
     }
 
     const onConfirm = async () => {
-        if (!reviewData) return
-
+        const current = reviewRef.current
+        if (!current || current.operation.isPending || current.operation.hasSent) return
+        setIsConfirming(true)
+        setSubmitError(null)
         try {
-            setSubmitError(null)
-            if (!privateKey) {
-                throw new Error('Wallet is not unlocked')
-            }
-            const nonce = await refetchNextNonce()
-            const balances = await refetchBalances()
-
-            if (typeof nonce.data === 'undefined' || nonce.data === null || nonce.error) {
-                throw new Error('Could not fetch nonce')
-            }
-
-            // Validate that we have fee data before proceeding
-            const feeData = recommendedFees?.[reviewData.fee]
-            if (!feeData) {
-                throw new Error('Could not fetch recommended fees')
-            }
-
-            // Use freshly fetched balance data for validation
-            const liveTokenBalance = getBalanceFromData(balances.data, reviewData.tokenAddress)
-            const liveNativeBalance = getBalanceFromData(balances.data, ZERO_ADDRESS)
-
-            const feeWei = Amounts.wei(calculateFee(recommendedFees, reviewData.fee))
-            const amountWei = Amounts.parseWithDecimals(reviewData.amount, tokenDecimals ?? DECIMALS.STANDARD)
-            const tokenBalanceWei = BigInt(liveTokenBalance?.balance ?? '0')
-            const nativeBalanceWei = BigInt(liveNativeBalance?.balance ?? '0')
-
-            // Validate balance before submitting
-            if (isNativeToken(reviewData.tokenAddress)) {
-                const totalRequired = amountWei + feeWei
-                if (totalRequired > nativeBalanceWei) {
-                    throw new Error('Insufficient balance for amount + fee')
-                }
-            } else {
-                if (amountWei > tokenBalanceWei) {
-                    throw new Error('Insufficient token balance')
-                }
-                if (feeWei > nativeBalanceWei) {
-                    throw new Error(`Insufficient ${nativeTokenSymbol} for fee`)
-                }
-            }
-
-            // Build the transaction
-            const tx = TxBuilder.create()
-                .type(TxType.TRANSFER)
-                .network(Network.MAINNET)
-                .recipient(reviewData.recipient as Address)
-                .amount(amountWei)
-                .fee(feeWei)
-                .nonce(BigInt(nonce.data))
-                .tokenAddress(reviewData.tokenAddress as Address)
-                .sign(privateKey)
-
-            // Encode transaction to hex
-            const txBytes = encodeTx(tx, true)
-            const txHex = bytesToHex(txBytes)
-
-            // Submit the transaction
-            const result = await submitTx({
-                data: {
-                    hexData: txHex,
-                },
-            })
-
-            // Check if transaction was successful
-            if (result?.status === 'SUCCESS') {
-                onSuccess?.(tx.hash)
-                setReviewData(null)
-                await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for success animation
-                pop()
-            } else {
-                throw new Error(result?.message || 'Transaction rejected')
-            }
+            const hash = await current.operation.submit()
+            if (!hash || !mounted.current || reviewRef.current !== current || !useWalletStore.getState().isSessionCurrent(current.snapshot)) return
+            reviewRef.current = null
+            setReview(null)
+            onSuccess?.(hash)
+            pop()
         } catch (error) {
-            console.error('Transaction failed:', error)
-            setSubmitError(error as Error)
-            onError?.(error as Error)
+            if (!mounted.current || reviewRef.current !== current || !useWalletStore.getState().isSessionCurrent(current.snapshot)) return
+            const failure = error instanceof Error ? error : new Error('Transaction failed')
+            const displayed = current.operation.hasSent
+                ? new Error(`${failure.message}. A submission was sent; check transaction history before creating another transfer.`, { cause: failure })
+                : failure
+            setSubmitError(displayed)
+            onError?.(displayed)
+        } finally {
+            if (mounted.current && reviewRef.current === current) setIsConfirming(false)
         }
     }
 
+    const onCancel = () => {
+        const current = reviewRef.current
+        // Once POST starts it cannot be recalled. Allow closing after its outcome is shown.
+        if (current?.operation.hasSent && current.operation.isPending) return
+        invalidateReview()
+    }
+
     const rootError = form.formState.errors.root?.message
-    const isLoading = isSubmitting || form.formState.isLoading
-    const isDisabled = isLoading || form.formState.disabled
+    const isLoading = isPreparingReview || isConfirming || form.formState.isLoading
+    const isDisabled = isLoading || !!review || form.formState.disabled || isLoadingTokens
 
     return (
         <>
             <form className="w-full" onSubmit={form.handleSubmit(onFormSubmit)}>
-                <Card className={cn("w-full")}>
+                <Card className={cn('w-full')}>
                     <CardHeader className="text-center">
                         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 [&_svg]:size-7 [&_svg]:text-primary">
                             <Send />
@@ -433,7 +382,6 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
                                         customInput={Input}
                                         placeholder={formatWei('0', tokenDecimals)}
                                         allowNegative={false}
-                                        decimalScale={tokenDecimals}
                                         thousandSeparator=","
                                         decimalSeparator="."
                                         inputMode="decimal"
@@ -526,15 +474,13 @@ export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardPr
             </form>
             <TxSubmitConfirm
                 onConfirm={onConfirm}
-                onCancel={() => {
-                    setReviewData(null)
-                    setSubmitError(null)
-                }}
+                onCancel={onCancel}
                 data={reviewData}
-                token={selectedToken}
-                nativeToken={nativeToken}
-                networkFeeData={recommendedFees?.[reviewData?.fee as FeeType]}
-                isLoading={isSubmitting}
+                token={review?.token}
+                nativeToken={review?.nativeToken}
+                fee={review?.fee ?? 0n}
+                isLoading={isConfirming}
+                hasSent={postStarted}
                 error={submitError}
             />
         </>
@@ -547,16 +493,15 @@ interface TxSubmitConfirmProps {
     data: TxSubmitForm | null
     token?: TokenDtoV1
     nativeToken?: TokenDtoV1
-    networkFeeData?: MempoolRecommendedFeesLevelDtoV1
+    fee: bigint
+    hasSent: boolean
     isLoading: boolean
     error: Error | null
 }
 
-const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, networkFeeData, isLoading, error }: TxSubmitConfirmProps) => {
+const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, fee, isLoading, hasSent, error }: TxSubmitConfirmProps) => {
 
-    const totalFee = BigInt(networkFeeData?.totalForAverageTx || '0')
-    // We already checked this in calculateFee but for display purposes logic is similar
-    const feeDisplay = nativeToken ? formatWei(totalFee.toString(), nativeToken.numberOfDecimals) : '0'
+    const feeDisplay = nativeToken ? formatWei(fee.toString(), nativeToken.numberOfDecimals) : '0'
 
     return (
         <Drawer open={!!data && !!token} onOpenChange={(open) => !open && onCancel()}>
@@ -568,6 +513,8 @@ const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, networ
                         render={(props) => (
                             <button
                                 type="button"
+                                disabled={isLoading && hasSent}
+                                aria-label="Close transaction review"
                                 className="absolute right-4 -top-2 p-2 rounded-full hover:bg-muted transition-colors"
                                 {...props}
                             >
@@ -604,15 +551,15 @@ const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, networ
 
                 <DrawerFooter>
                     <DrawerClose render={(props) => (
-                        <Button variant="outline" className="w-full" {...props}>
-                            Cancel
+                        <Button variant="outline" className="w-full" {...props} disabled={isLoading && hasSent}>
+                            {hasSent ? 'Close' : 'Cancel'}
                         </Button>
                     )} />
                     <Button
                         size="lg"
                         className="w-full"
                         onClick={onConfirm}
-                        disabled={isLoading}
+                        disabled={isLoading || hasSent}
                     >
                         {isLoading ? (
                             <>

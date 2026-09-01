@@ -85,7 +85,7 @@ public class WebhookSignatureVerifier {
         if (!MessageDigest.isEqual(
                 signature.getBytes(StandardCharsets.UTF_8),
                 calculatedSignature.getBytes(StandardCharsets.UTF_8))) {
-            log.warn("Invalid webhook signature. Received: {}, Calculated: {}", signature, calculatedSignature);
+            log.warn("Invalid webhook signature");
             throw new GEValidationException("Invalid webhook signature");
         }
     }

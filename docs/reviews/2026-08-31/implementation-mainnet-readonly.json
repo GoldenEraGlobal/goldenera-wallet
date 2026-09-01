@@ -1,0 +1,33 @@
+{
+  "backendReadSmoke" : "PASS",
+  "balanceInvariant" : true,
+  "blockedOutboundAttempts" : 0,
+  "cleanupComplete" : true,
+  "feesRead" : true,
+  "historyPageSizes" : [ 1, 0 ],
+  "historyTotalsAtRead" : [ 1, 1 ],
+  "isolatedPostgresql" : true,
+  "localOrigin" : "http://127.0.0.1:18086",
+  "nodeInfoRead" : true,
+  "nodeMutationsSent" : 0,
+  "nodeRequestMethodsAndPaths" : {
+    "GET /api/core/v1/blockchain/account/{address}/summary" : 1,
+    "GET /api/core/v1/blockchain/latest-height" : 5,
+    "GET /api/core/v1/blockchain/worldstate/tokens" : 3,
+    "GET /api/core/v1/info" : 1,
+    "GET /api/core/v1/mempool/recommended-fees" : 2,
+    "GET /api/explorer/v1/account/balance/page" : 1,
+    "GET /api/explorer/v1/token/by-address/{address}" : 1,
+    "READ_ONLY_POST /api/explorer/v1/account/balance/page/bulk" : 5,
+    "READ_ONLY_POST /api/explorer/v1/mem-transfer/page/bulk" : 10,
+    "READ_ONLY_POST /api/explorer/v1/transfer/page/bulk" : 5
+  },
+  "nonceRead" : true,
+  "publicWatchAddress" : "0x1B4148166C78DBcd66Ffc195ded697dBd681bbD6",
+  "redirects" : "NEVER",
+  "sampledBalanceVersions" : [ "V1" ],
+  "schedulersRemoved" : true,
+  "syntheticAddressBalanceRows" : 0,
+  "tokenCount" : 1,
+  "transactionSubmissionsSent" : 0
+}

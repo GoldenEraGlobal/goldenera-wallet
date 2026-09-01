@@ -1,0 +1,23 @@
+{
+  "vite-react-changelog": "https://raw.githubusercontent.com/vitejs/vite-plugin-react/main/packages/plugin-react/CHANGELOG.md",
+  "stackflow-react-changelog": "https://raw.githubusercontent.com/daangn/stackflow/main/integrations/react/CHANGELOG.md",
+  "stackflow-history-changelog": "https://raw.githubusercontent.com/daangn/stackflow/main/extensions/plugin-history-sync/CHANGELOG.md",
+  "web3j-releases": "https://api.github.com/repos/LFDT-web3j/web3j/releases?per_page=8",
+  "crypto-releases": "https://api.github.com/repos/GoldenEraGlobal/goldenera-cryptoj-js/releases?per_page=10",
+  "gradle": "https://services.gradle.org/versions/current",
+  "node": "https://nodejs.org/dist/index.json",
+  "springdoc": "https://repo.maven.apache.org/maven2/org/springdoc/springdoc-openapi-starter-webmvc-ui/maven-metadata.xml",
+  "hypersistence-7": "https://repo.maven.apache.org/maven2/io/hypersistence/hypersistence-utils-hibernate-71/maven-metadata.xml",
+  "maven": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/maven-metadata.xml",
+  "android-gradle": "https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/maven-metadata.xml",
+  "android-google-services": "https://dl.google.com/dl/android/maven2/com/google/gms/google-services/maven-metadata.xml",
+  "android-activity": "https://dl.google.com/dl/android/maven2/androidx/activity/activity/maven-metadata.xml",
+  "android-appcompat": "https://dl.google.com/dl/android/maven2/androidx/appcompat/appcompat/maven-metadata.xml",
+  "android-coordinatorlayout": "https://dl.google.com/dl/android/maven2/androidx/coordinatorlayout/coordinatorlayout/maven-metadata.xml",
+  "android-core": "https://dl.google.com/dl/android/maven2/androidx/core/core/maven-metadata.xml",
+  "android-fragment": "https://dl.google.com/dl/android/maven2/androidx/fragment/fragment/maven-metadata.xml",
+  "android-splashscreen": "https://dl.google.com/dl/android/maven2/androidx/core/core-splashscreen/maven-metadata.xml",
+  "android-webkit": "https://dl.google.com/dl/android/maven2/androidx/webkit/webkit/maven-metadata.xml",
+  "android-junit": "https://dl.google.com/dl/android/maven2/androidx/test/ext/junit/maven-metadata.xml",
+  "android-espresso": "https://dl.google.com/dl/android/maven2/androidx/test/espresso/espresso-core/maven-metadata.xml"
+}

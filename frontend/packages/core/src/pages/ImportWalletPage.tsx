@@ -8,7 +8,7 @@ import {
     Spinner,
     Switch, Textarea
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertCircle, ChevronLeft, Download, Fingerprint, KeyRound, ScanFace, Shield } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -26,7 +26,7 @@ const mnemonicSchema = z.object({
             const words = val.trim().split(/\s+/)
             return words.length === 12 || words.length === 24
         }, 'Recovery phrase must be 12 or 24 words')
-        .refine((val) => WalletUtil.isValidMnemonic(val.trim()), 'Invalid recovery phrase'),
+        .refine((val) => WalletUtil.isValidMnemonic(val.trim().toLowerCase().replace(/\s+/g, ' ')), 'Invalid recovery phrase'),
 })
 
 // Schema for Password
@@ -51,7 +51,7 @@ type PasswordForm = z.infer<typeof passwordSchema>
 
 type Step = 'mnemonic' | 'password'
 
-export const ImportWalletPage: ActivityComponentType = () => {
+export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () => {
     const { pop } = useFlow()
     const importWallet = useWalletStore((state) => state.importWallet)
     const [step, setStep] = useState<Step>('mnemonic')
@@ -202,7 +202,7 @@ export const ImportWalletPage: ActivityComponentType = () => {
                             <PasswordInput
                                 placeholder="Enter your password"
                                 {...passwordForm.register('password')}
-                                disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading}
+                                disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting}
                             />
                             {passwordError && <FieldError>{passwordError}</FieldError>}
                         </Field>
@@ -212,7 +212,7 @@ export const ImportWalletPage: ActivityComponentType = () => {
                             <PasswordInput
                                 placeholder="Confirm your password"
                                 {...passwordForm.register('confirmPassword')}
-                                disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading}
+                                disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting}
                             />
                             {confirmError && <FieldError>{confirmError}</FieldError>}
                         </Field>
@@ -246,10 +246,10 @@ export const ImportWalletPage: ActivityComponentType = () => {
                         type="button"
                         size="lg"
                         className="w-full"
-                        disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading || !passwordForm.formState.isValid}
+                        disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting || !passwordForm.formState.isValid}
                         onClick={passwordForm.handleSubmit(handleImport)}
                     >
-                        {passwordForm.formState.isLoading ? (
+                        {passwordForm.formState.isSubmitting ? (
                             <>
                                 <Spinner />
                                 Importing Wallet...

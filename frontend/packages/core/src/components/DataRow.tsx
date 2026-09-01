@@ -1,5 +1,5 @@
-import { CheckCircle2, Copy } from "lucide-react";
-import { useCopy } from "../hooks/useCopy";
+import { CheckCircle2, Copy } from 'lucide-react'
+import { useCopy } from '../hooks/useCopy'
 
 export const DataRow = ({ label, value, valueToCopy, copyable }: { label: string; value: string | number | undefined; valueToCopy?: string | number; copyable?: boolean }) => {
     const { copy, copied } = useCopy()

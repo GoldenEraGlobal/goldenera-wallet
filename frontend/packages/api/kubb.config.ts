@@ -1,56 +1,43 @@
-import { type UserConfig } from '@kubb/core'
-import { pluginOas } from '@kubb/plugin-oas'
-import { pluginReactQuery } from '@kubb/plugin-react-query'
-import { QueryKey } from '@kubb/plugin-react-query/components'
+import { adapterOas } from '@kubb/adapter-oas'
+import { pluginAxios } from '@kubb/plugin-axios'
+import { pluginReactQuery, resolverReactQuery } from '@kubb/plugin-react-query'
 import { pluginTs } from '@kubb/plugin-ts'
+import { defineConfig } from 'kubb'
 
-export const config: UserConfig = {
+// Keep generation reproducible: update this snapshot deliberately alongside API changes.
+export default defineConfig({
   root: '.',
-  input: {
-    path: 'http://localhost:8080/v3/api-docs',
-  },
-  output: {
-    path: './src/gen',
-    clean: true,
-    extension: {
-      '.ts': '',
-    },
-  },
+  input: './openapi.json',
+  adapter: adapterOas(),
+  output: { path: './src/gen', clean: true, barrel: { type: 'named' } },
   plugins: [
-    pluginOas({ 
-        generators: [],
-        validate: false,
-    }),
-    pluginTs({
-      output: {
-        path: 'models',
-      },
-    }),
+    pluginTs({ output: { path: 'models', mode: 'directory' } }),
+    pluginAxios({ output: { path: 'clients', mode: 'directory' }, baseURL: '/' }),
     pluginReactQuery({
-      client: {
-        importPath: '../../../client', 
-      },
-      transformers: {
-        name: (name, type) => {
-          if (type === 'file' || type === 'function') {
-            return `${name}Hook`
-          }
-          return name
+      output: { path: 'hooks', mode: 'directory' },
+      group: { type: 'tag' },
+      client: 'axios',
+      hooks: true,
+      resolver: {
+        query: {
+          name(node) { return `${resolverReactQuery.query.name(node)}Hook` },
+        },
+        suspenseQuery: {
+          name(node) { return `${resolverReactQuery.suspenseQuery.name(node)}Hook` },
+        },
+        mutation: {
+          name(node) { return `${resolverReactQuery.mutation.name(node)}Hook` },
         },
       },
-      output: {
-        path: './hooks',
-      },
-      group: {
-        type: 'tag',
-      },
-      queryKey(props) {
-        const keys = QueryKey.getTransformer(props)
-        return ['"v1"', ...keys]
+      queryKey({ node }) {
+        return [
+          JSON.stringify('v1'),
+          `{ url: ${JSON.stringify(node.path)} }`,
+          ...(node.parameters.some((parameter) => parameter.in === 'query')
+            ? ['...(query ? [query] : [])'] : []),
+        ]
       },
       suspense: {},
     }),
   ],
-}
-
-export default config
+})

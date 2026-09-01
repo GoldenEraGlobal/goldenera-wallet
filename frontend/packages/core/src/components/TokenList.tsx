@@ -46,7 +46,7 @@ function TokenItem({
 }) {
     const tokenName = item.token.name || 'Token'
     const tokenSymbol = item.token.smallestUnitName || 'TKN'
-    const tokenDecimals = item.token.numberOfDecimals || 8
+    const tokenDecimals = item.token.numberOfDecimals ?? 8
     const logoUrl = item.token.logoUrl
 
     return (
@@ -87,9 +87,9 @@ export function TokenList() {
 
     // Fetch balances (always fetch to show owned tokens)
     const { data: balances, isLoading: isLoadingBalances, refetch: refetchBalances } = useGetBalancesHook(
-        {
+        { query: {
             addresses: address ? [address] : []
-        },
+        } },
         {
             query: {
                 enabled: !!address,

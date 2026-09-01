@@ -23,6 +23,13 @@
  */
 package global.goldenera.wallet.api.core.v1.wallet.dtos;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 public record TxSubmitDtoV1(
+        @NotBlank
+        @Size(max = 200_002)
+        @Pattern(regexp = "^0x(?:[0-9a-fA-F]{2})+$")
         String hexData) {
 }

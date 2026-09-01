@@ -1,4 +1,4 @@
-import { Preferences } from "@capacitor/preferences";
+import { Preferences } from '@capacitor/preferences'
 import {
     Button,
     Drawer,
@@ -8,8 +8,8 @@ import {
     DrawerHeader,
     DrawerTitle,
     DrawerTrigger
-} from "@project/ui";
-import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
+} from '@project/ui'
+import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin'
 
 const enabled = false
 

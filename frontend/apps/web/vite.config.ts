@@ -10,13 +10,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    tailwindcss({
-      content: [
-        './src/**/*.{ts,tsx,css}',
-        '../../packages/ui/src/**/*.{ts,tsx,css}',
-        '../../packages/core/src/**/*.{ts,tsx}',
-      ],
-    } as never),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-64x64.png', 'pwa-192x192.png', 'pwa-512x512.png', 'maskable-icon-512x512.png', 'apple-touch-icon-180x180.png', 'favicon.ico'],
@@ -33,25 +27,25 @@ export default defineConfig({
         categories: ['crypto', 'wallet'],
         icons: [
           {
-            "src": "pwa-64x64.png",
-            "sizes": "64x64",
-            "type": "image/png"
+            'src': 'pwa-64x64.png',
+            'sizes': '64x64',
+            'type': 'image/png'
           },
           {
-            "src": "pwa-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png"
+            'src': 'pwa-192x192.png',
+            'sizes': '192x192',
+            'type': 'image/png'
           },
           {
-            "src": "pwa-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png"
+            'src': 'pwa-512x512.png',
+            'sizes': '512x512',
+            'type': 'image/png'
           },
           {
-            "src": "maskable-icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
+            'src': 'maskable-icon-512x512.png',
+            'sizes': '512x512',
+            'type': 'image/png',
+            'purpose': 'maskable'
           }
         ],
         screenshots: [],
@@ -107,15 +101,17 @@ export default defineConfig({
     })
   ],
   build: {
+    // Preserve the previous PWA browser floor while moving to Vite 8.
+    target: ['chrome107', 'edge107', 'firefox104', 'safari16'],
     chunkSizeWarningLimit: 1000,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: (id) => {
+        codeSplitting: { groups: [{ name: (id) => {
           if (id.includes('node_modules')) {
             if (/[\\/]node_modules[\\/](react|react-dom)[\\/]/.test(id)) {
               return 'vendor-react'
             }
-            if (/[\\/]node_modules[\\/](@base-ui|lucide-react|clsx|tailwind-merge|motion|vaul|vaul-base)[\\/]/.test(id)) {
+            if (/[\\/]node_modules[\\/](@base-ui|lucide-react|clsx|tailwind-merge|motion)[\\/]/.test(id)) {
               return 'vendor-ui'
             }
             if (/[\\/]node_modules[\\/](@capacitor|@capawesome|@capgo|@ionic\/pwa-elements|capacitor-secure-storage-plugin)[\\/]/.test(id)) {
@@ -134,7 +130,8 @@ export default defineConfig({
               return 'vendor-crypto'
             }
           }
-        }
+          return null
+        } }] }
       }
     }
   },

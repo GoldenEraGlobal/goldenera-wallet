@@ -49,7 +49,7 @@ public class NodeInfoService {
     /**
      * Get node information including sync status.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public NodeInfoDtoV1 getInfo() {
         return nodeInfoApi.getNodeInfo().getBody();
     }

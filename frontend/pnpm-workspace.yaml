@@ -2,14 +2,58 @@ packages:
   - apps/*
   - packages/*
 
-onlyBuiltDependencies:
-  - '@firebase/util'
-  - '@parcel/watcher'
-  - '@swc/core'
-  - es5-ext
-  - esbuild
-  - lmdb
-  - msgpackr-extract
-  - msw
-  - protobufjs
-  - sharp
+# assets-generator 1.0.2 only uses supported constructor/resize/composite/output
+# APIs; validated with the real minimal-2023 CLI and PNG/ICO decoding on Node 24.
+# Keep this override scoped until the parent upgrades its pre-0.35 dependency.
+# See docs/reviews/2026-08-31/implementation-final-qa.md (GHSA-f88m-g3jw-g9cj).
+overrides:
+  '@vite-pwa/assets-generator@1.0.2>sharp': 0.35.4
+  # The exact 0.27.7 release is affected by GHSA-g7r4-m6w7-qqqr. The
+  # 0.28.2 replacement is exercised through tsup, Kubb and both Vite builds.
+  'esbuild@0.27.7': 0.28.2
+  # Capacitor CLI's xcode parser only consumes the stable CommonJS uuid.v4
+  # API. Keep the override on that parent instead of replacing the app's uuid.
+  'xcode@3.0.1>uuid': 11.1.1
+
+# Explicit native build permissions, migrated from pnpm 10 onlyBuiltDependencies.
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  es5-ext: true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true
+  msw: true
+  protobufjs: true
+  sharp: true
+
+# These exact releases were inspected during the 2026-08-31 upgrade.
+# Keep the default release-age protection for all other packages.
+minimumReleaseAgeExclude:
+  - '@goldenera/cryptoj@0.5.0'
+  - 'typescript-eslint@8.69.0'
+  - '@typescript-eslint/parser@8.69.0'
+  - '@typescript-eslint/eslint-plugin@8.69.0'
+  - '@typescript-eslint/scope-manager@8.69.0'
+  - '@typescript-eslint/types@8.69.0'
+  - '@typescript-eslint/typescript-estree@8.69.0'
+  - '@typescript-eslint/utils@8.69.0'
+  - '@typescript-eslint/visitor-keys@8.69.0'
+  - '@typescript-eslint/type-utils@8.69.0'
+  - '@typescript-eslint/project-service@8.69.0'
+  - '@typescript-eslint/tsconfig-utils@8.69.0'
+  - '@capacitor-mlkit/barcode-scanning@8.1.1'
+  - lucide-react@1.38.0
+  - shadcn@4.19.1
+  - '@kubb/adapter-oas@5.0.5'
+  - '@kubb/ast@5.0.5'
+  - '@kubb/cli@5.0.5'
+  - '@kubb/core@5.0.5'
+  - '@kubb/kit@5.0.5'
+  - '@kubb/mcp@5.0.5'
+  - '@kubb/parser-md@5.0.5'
+  - '@kubb/parser-ts@5.0.5'
+  - '@kubb/plugin-barrel@5.0.5'
+  - '@kubb/renderer-jsx@5.0.5'
+  - kubb@5.0.5
+  - unplugin-kubb@5.0.33

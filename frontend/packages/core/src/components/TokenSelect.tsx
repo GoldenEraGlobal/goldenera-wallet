@@ -1,5 +1,6 @@
-import { Address, NATIVE_TOKEN } from "@goldenera/cryptoj";
-import { useGetTokensHook } from "@project/api";
+import type { Address} from '@goldenera/cryptoj'
+import { NATIVE_TOKEN } from '@goldenera/cryptoj'
+import { useGetTokensHook } from '@project/api'
 import {
     Avatar,
     AvatarFallback,
@@ -13,9 +14,9 @@ import {
     SelectTrigger,
     SelectValue,
     Spinner
-} from "@project/ui";
-import { useUncontrolledProp } from "uncontrollable";
-import { compareAddress } from "../utils/WalletUtil";
+} from '@project/ui'
+import { useUncontrolledProp } from 'uncontrollable'
+import { compareAddress } from '../utils/WalletUtil'
 
 export interface TokenSelectProps {
     value?: Address | null | string
@@ -30,7 +31,7 @@ export const TokenSelect = ({ value, onChange, disabled, className, name }: Toke
     const { data: tokensData, isLoading: isLoadingTokens } = useGetTokensHook()
     const tokens = tokensData || []
     const token = tokens.find(t => compareAddress(t.address, selectedToken))
-    const tokenName = isLoadingTokens ? "Loading tokens..." : (token ? `${token.name} (${token.smallestUnitName})` : "Select a token")
+    const tokenName = isLoadingTokens ? 'Loading tokens...' : (token ? `${token.name} (${token.smallestUnitName})` : 'Select a token')
 
     return (
         <Select
@@ -39,7 +40,7 @@ export const TokenSelect = ({ value, onChange, disabled, className, name }: Toke
             disabled={disabled || isLoadingTokens}
             name={name}
         >
-            <SelectTrigger className={cn("w-full h-9", className)} size="lg">
+            <SelectTrigger className={cn('w-full h-9', className)} size="lg">
                 <SelectValue className="flex items-center gap-2">
                     {token && (
                         <Avatar className="size-5 after:border-none">

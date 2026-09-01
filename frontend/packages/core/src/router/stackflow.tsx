@@ -1,10 +1,12 @@
-import { basicUIPlugin } from "@stackflow/plugin-basic-ui";
-import { historySyncPlugin } from "@stackflow/plugin-history-sync";
-import { basicRendererPlugin } from "@stackflow/plugin-renderer-basic";
-import { webRendererPlugin } from "@stackflow/plugin-renderer-web";
-import { stackflow } from "@stackflow/react";
-import { createMemoryHistory, type History } from "history";
-import { useEffect, useState } from "react";
+import './activities'
+import { defineConfig } from '@stackflow/config'
+import { basicUIPlugin } from '@stackflow/plugin-basic-ui'
+import { historySyncPlugin } from '@stackflow/plugin-history-sync'
+import { basicRendererPlugin } from '@stackflow/plugin-renderer-basic'
+import { webRendererPlugin } from '@stackflow/plugin-renderer-web'
+import { stackflow } from '@stackflow/react'
+import { createMemoryHistory, type History } from 'history'
+import { useEffect, useState } from 'react'
 import {
     BackupPhrasePage,
     CreateWalletPage,
@@ -17,22 +19,21 @@ import {
     ToggleBiometricPage,
     TokenDetailPage,
     WelcomePage
-} from "../pages";
-import { TxSubmitPage } from "../pages/TxSubmitPage";
-import { useWalletStore } from "../store/WalletStore";
+} from '../pages'
+import { TxSubmitPage } from '../pages/TxSubmitPage'
+import { useWalletStore } from '../store/WalletStore'
 import {
     getTheme,
     isNotIos as isNotIosPlatform,
     shouldUseWebRenderer
-} from "../utils/PlatformUtil";
-import { RootCtx } from "./RootContext";
+} from '../utils/PlatformUtil'
+import { RootCtx } from './RootContext'
 
 export const TRANSITION_DURATION = 270
-const AUTO_LOCK_TIMEOUT = 2 * 60 * 1000
 
-const useWebRenderer = shouldUseWebRenderer();
-const isNotIos = isNotIosPlatform();
-const theme = getTheme();
+const useWebRenderer = shouldUseWebRenderer()
+const isNotIos = isNotIosPlatform()
+const theme = getTheme()
 
 const basePlugins = [
     useWebRenderer ? webRendererPlugin() : basicRendererPlugin(),
@@ -40,7 +41,7 @@ const basePlugins = [
         rootClassName: `root-ui theme-${theme}`,
         theme,
     })
-];
+]
 const transitionDuration = useWebRenderer ? 0 : TRANSITION_DURATION
 
 // Custom history wrapper that can be properly cleaned up
@@ -49,7 +50,6 @@ class CleanableHistory {
     private popstateHandler: ((event: PopStateEvent) => void) | null = null
     private listeners: Set<() => void> = new Set()
     private historyIndex = 0 // Track our position in browser history
-    private processingPop = false
     private instanceId = Date.now().toString(36) + Math.random().toString(36).substr(2)
 
     constructor() {
@@ -66,7 +66,6 @@ class CleanableHistory {
             }, '', window.location.href)
 
             this.popstateHandler = (event: PopStateEvent) => {
-                this.processingPop = true
                 try {
                     const state = event.state
 
@@ -99,7 +98,7 @@ class CleanableHistory {
                         }, '', window.location.href)
                     }
                 } finally {
-                    this.processingPop = false
+                    // History synchronization completes in this callback.
                 }
             }
             window.addEventListener('popstate', this.popstateHandler)
@@ -137,6 +136,16 @@ class CleanableHistory {
                 '',
                 window.location.pathname + '#' + this.history.location.pathname
             )
+        }
+    }
+
+    // Stackflow 3 history reconciliation uses go(delta), not only back()/forward().
+    go(delta: number) {
+        if (typeof window !== 'undefined') {
+            window.history.go(delta)
+        } else {
+            this.historyIndex += delta
+            this.history.go(delta)
         }
     }
 
@@ -204,144 +213,112 @@ class CleanableHistory {
     }
 }
 
-// Stack factory functions
-const createAuthenticatedStack = (history: CleanableHistory) => {
-    return stackflow({
-        transitionDuration,
-        activities: {
-            ShowPhrasePage,
-            DashboardPage,
-            SettingsPage,
-            ToggleBiometricPage,
-            DeleteWalletPage,
-            TokenDetailPage,
-            ScanQrCodePage,
-            TxSubmitPage
-        },
-        plugins: [
-            ...basePlugins,
-            historySyncPlugin({
-                routes: {
-                    DashboardPage: "/",
-                    ShowPhrasePage: "/show-phrase",
-                    SettingsPage: "/settings",
-                    DeleteWalletPage: "/delete-wallet",
-                    ScanQrCodePage: "/scan-qr-code",
-                    ToggleBiometricPage: "/toggle-biometric",
-                    TokenDetailPage: "/token/:tokenAddress",
-                    TxSubmitPage: '/tx-submit'
-                },
-                fallbackActivity: () => 'DashboardPage',
-                useHash: false, // No hash needed with memory history
-                history: history as unknown as History
-            })
-        ]
-    })
+// All components are available to the renderer; each config registers only the
+// activities that belonged to that auth/backup stack before the v2 migration.
+const components = {
+    ShowPhrasePage, DashboardPage, SettingsPage, ToggleBiometricPage,
+    DeleteWalletPage, TokenDetailPage, ScanQrCodePage, TxSubmitPage,
+    WelcomePage, CreateWalletPage, ImportWalletPage, BackupPhrasePage,
 }
 
-const createUnauthenticatedStack = (history: CleanableHistory) => {
-    return stackflow({
-        transitionDuration,
-        activities: {
-            WelcomePage,
-            CreateWalletPage,
-            ImportWalletPage
-        },
-        plugins: [
-            ...basePlugins,
-            historySyncPlugin({
-                routes: {
-                    WelcomePage: "/",
-                    CreateWalletPage: "/create-wallet",
-                    ImportWalletPage: "/import-wallet",
-                },
-                fallbackActivity: () => 'WelcomePage',
-                useHash: false,
-                history: history as unknown as History
-            })
-        ]
-    })
-}
+const authenticatedConfig = defineConfig({
+    transitionDuration,
+    activities: [
+        { name: 'DashboardPage', route: '/' },
+        { name: 'ShowPhrasePage', route: '/show-phrase' },
+        { name: 'SettingsPage', route: '/settings' },
+        { name: 'DeleteWalletPage', route: '/delete-wallet' },
+        { name: 'ScanQrCodePage', route: '/scan-qr-code' },
+        { name: 'ToggleBiometricPage', route: '/toggle-biometric' },
+        { name: 'TokenDetailPage', route: '/token/:tokenAddress' },
+        { name: 'TxSubmitPage', route: '/tx-submit' },
+    ],
+})
+const unauthenticatedConfig = defineConfig({
+    transitionDuration,
+    activities: [
+        { name: 'WelcomePage', route: '/' },
+        { name: 'CreateWalletPage', route: '/create-wallet' },
+        { name: 'ImportWalletPage', route: '/import-wallet' },
+    ],
+})
+const backupConfig = defineConfig({
+    transitionDuration,
+    activities: [{ name: 'BackupPhrasePage', route: '/' }],
+})
 
-const createBackupStack = (history: CleanableHistory) => {
-    return stackflow({
-        transitionDuration,
-        activities: {
-            BackupPhrasePage
-        },
-        plugins: [
-            ...basePlugins,
-            historySyncPlugin({
-                routes: {
-                    BackupPhrasePage: "/",
-                },
-                fallbackActivity: () => 'BackupPhrasePage',
-                useHash: false,
-                history: history as unknown as History
-            })
-        ]
-    })
-}
+const createAuthenticatedStack = (history: CleanableHistory) => stackflow({
+    config: authenticatedConfig,
+    components,
+    plugins: [
+        ...basePlugins,
+        historySyncPlugin({
+            config: authenticatedConfig,
+            fallbackActivity: () => 'DashboardPage',
+            useHash: false,
+            history: history as unknown as History,
+        }),
+    ],
+})
+const createUnauthenticatedStack = (history: CleanableHistory) => stackflow({
+    config: unauthenticatedConfig,
+    components,
+    plugins: [
+        ...basePlugins,
+        historySyncPlugin({
+            config: unauthenticatedConfig,
+            fallbackActivity: () => 'WelcomePage',
+            useHash: false,
+            history: history as unknown as History,
+        }),
+    ],
+})
+const createBackupStack = (history: CleanableHistory) => stackflow({
+    config: backupConfig,
+    components,
+    plugins: [
+        ...basePlugins,
+        historySyncPlugin({
+            config: backupConfig,
+            fallbackActivity: () => 'BackupPhrasePage',
+            useHash: false,
+            history: history as unknown as History,
+        }),
+    ],
+})
 
-type StackStatus = 'unlocked' | 'backup' | 'locked'
+type StackStatus = 'unlocked' | 'backup' | 'locked' | 'error'
 
-// Hook to handle auto-lock after inactivity
-const useAutoLock = (isUnlocked: boolean) => {
-    const lockWallet = useWalletStore(state => state.lockWallet)
-
+// Deadlines survive browser suspension; visibility changes never extend them.
+const useAutoLock = (hasSession: boolean) => {
     useEffect(() => {
-        // Only run auto-lock when wallet is unlocked
-        if (!isUnlocked) {
-            return
-        }
-
+        if (!hasSession) return
         let timeoutId: ReturnType<typeof setTimeout>
-
-        const resetTimer = () => {
+        const schedule = () => {
             clearTimeout(timeoutId)
-            timeoutId = setTimeout(() => {
-                console.log('Auto-locking wallet due to inactivity')
-                lockWallet()
-            }, AUTO_LOCK_TIMEOUT)
+            const state = useWalletStore.getState()
+            if (!state.checkSessionDeadline()) return
+            timeoutId = setTimeout(() => state.checkSessionDeadline(), Math.max(0, (state.sessionExpiresAt ?? 0) - Date.now()))
         }
-
-        // Events that indicate user activity
-        const activityEvents = [
-            'mousedown',
-            'mousemove',
-            'keydown',
-            'scroll',
-            'touchstart',
-            'touchmove',
-            'click',
-            'wheel'
-        ]
-
-        // Add listeners for all activity events
-        activityEvents.forEach(event => {
-            window.addEventListener(event, resetTimer, { passive: true })
-        })
-
-        // Also reset on visibility change (user switches back to tab)
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                resetTimer()
-            }
+        const activity = () => {
+            useWalletStore.getState().touchSession()
+            schedule()
         }
-        document.addEventListener('visibilitychange', handleVisibilityChange)
-
-        // Start the initial timer
-        resetTimer()
-
-        // Cleanup
+        const resume = () => {
+            if (document.visibilityState === 'visible') schedule()
+        }
+        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'touchmove', 'click', 'wheel']
+        events.forEach(event => window.addEventListener(event, activity, { passive: true }))
+        document.addEventListener('visibilitychange', resume)
+        window.addEventListener('pageshow', schedule)
+        schedule()
         return () => {
             clearTimeout(timeoutId)
-            activityEvents.forEach(event => {
-                window.removeEventListener(event, resetTimer)
-            })
-            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            events.forEach(event => window.removeEventListener(event, activity))
+            document.removeEventListener('visibilitychange', resume)
+            window.removeEventListener('pageshow', schedule)
         }
-    }, [isUnlocked, lockWallet])
+    }, [hasSession])
 }
 
 // Component that manages a single stack with proper cleanup
@@ -388,13 +365,13 @@ export const Stack = () => {
     const status = useWalletStore(state => state.status)
 
     // Auto-lock after 2 minutes of inactivity when wallet is unlocked
-    useAutoLock(status === 'unlocked')
+    useAutoLock(status === 'unlocked' || status === 'backup')
 
     if (status === 'loading') {
         return null
     }
 
-    const effectiveStatus: StackStatus = status === 'unlocked' ? 'unlocked' : status === 'backup' ? 'backup' : 'locked'
+    const effectiveStatus: StackStatus = status === 'unlocked' ? 'unlocked' : status === 'backup' ? 'backup' : status === 'error' ? 'error' : 'locked'
 
     return (
         <RootCtx.Provider value={{ isNotIos, useWebRenderer, theme }}>

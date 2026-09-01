@@ -1,0 +1,43 @@
+{
+  "date": "2026-08-31",
+  "scope": "Offline comparison of the final full-workspace lockfile against the originally authorized npm advisory snapshot. This is not a fresh online audit. Original paths are representative only.",
+  "lockfileSha256": "6d64f90b7178eb43f59daf70012ad39c64814ce3436ad4498197194b986cce17",
+  "onlineAudit": {
+    "status": "blocked_by_approval_reviewer",
+    "attemptedBy": "final_qa",
+    "reason": "Workspace package names and versions may be private; reviewer did not accept inherited authorization as explicit authorization of this payload and npm destination. No retry or alternate endpoint."
+  },
+  "oldUniqueGhsa": 180,
+  "remainingOldUniqueGhsa": 1,
+  "severityOfRemainingUniqueGhsa": {
+    "critical": 0,
+    "high": 1,
+    "moderate": 0,
+    "low": 0
+  },
+  "resolvedSharp": {
+    "installedVersions": [
+      "0.35.4"
+    ],
+    "advisory": "GHSA-f88m-g3jw-g9cj",
+    "scope": "PWA development asset generator",
+    "runtimeVersion": "0.35.4",
+    "libvipsVersion": "8.18.6",
+    "realCliTest": "passed; 6 PNG/ICO outputs decoded and dimension/pixel checked"
+  },
+  "hits": [
+    {
+      "ghsa": "GHSA-mw96-cpmx-2vgc",
+      "package": "rollup",
+      "severity": "high",
+      "installedAffectedVersions": [
+        "2.79.2"
+      ],
+      "patchedRange": ">=2.80.0",
+      "url": "https://github.com/advisories/GHSA-mw96-cpmx-2vgc",
+      "originalRepresentativePaths": [
+        "apps__extension>@crxjs/vite-plugin>rollup"
+      ]
+    }
+  ]
+}

@@ -36,6 +36,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -56,6 +57,32 @@ import lombok.extern.slf4j.Slf4j;
 @FieldDefaults(level = PRIVATE, makeFinal = true)
 @Slf4j
 public class SecurityConfig {
+
+        private static final String PWA_CONTENT_SECURITY_POLICY = String.join("; ",
+                        "default-src 'self'",
+                        "base-uri 'self'",
+                        "object-src 'none'",
+                        "frame-ancestors 'none'",
+                        "form-action 'self'",
+                        "script-src 'self' 'wasm-unsafe-eval'",
+                        "style-src 'self' 'unsafe-inline'",
+                        "img-src 'self' data: blob: https:",
+                        "font-src 'self' data: https:",
+                        "connect-src 'self'",
+                        "worker-src 'self' blob:",
+                        "media-src 'self' blob:",
+                        "manifest-src 'self'",
+                        "frame-src 'none'");
+
+        private static final String PWA_PERMISSIONS_POLICY = String.join(", ",
+                        "camera=(self)",
+                        "clipboard-write=(self)",
+                        "publickey-credentials-create=(self)",
+                        "publickey-credentials-get=(self)",
+                        "geolocation=()",
+                        "microphone=()",
+                        "payment=()",
+                        "usb=()");
 
         /**
          * Filter chain for the "master password" admin area.
@@ -93,6 +120,26 @@ public class SecurityConfig {
 
                 http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .addFilterBefore(throttlingFilter, UsernamePasswordAuthenticationFilter.class);
+                return http.build();
+        }
+
+        /** Public PWA/static resources with browser isolation headers. */
+        @Bean
+        @Order(3)
+        public SecurityFilterChain pwaFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                                .csrf(csrf -> csrf.disable())
+                                .formLogin(login -> login.disable())
+                                .httpBasic(basic -> basic.disable())
+                                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .headers(headers -> headers
+                                                // Preserve resource/PWA cache headers; only add isolation controls.
+                                                .cacheControl(cache -> cache.disable())
+                                                .contentSecurityPolicy(csp -> csp.policyDirectives(PWA_CONTENT_SECURITY_POLICY))
+                                                .frameOptions(frame -> frame.deny())
+                                                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                                                .permissionsPolicyHeader(policy -> policy.policy(PWA_PERMISSIONS_POLICY)));
                 return http.build();
         }
 

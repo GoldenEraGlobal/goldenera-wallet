@@ -1,0 +1,9 @@
+{
+  "pid": 2999648,
+  "processExited": true,
+  "ownedContainersRemoved": true,
+  "containerIds": [
+    "4ad771b315b3bca6278d630fd0f37e2a5381d5b145678e178be7f5d95b6f6566",
+    "b22d50bfee323bf6410fd20c8d836c84f92a83edcafb40a884b42b489bf25b3f"
+  ]
+}

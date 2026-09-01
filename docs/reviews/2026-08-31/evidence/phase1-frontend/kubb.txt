@@ -1,0 +1,76 @@
+Generate TypeScript types, API clients, React Query hooks, Zod schemas, and more from an OpenAPI specification. Reads kubb.config.ts by default. Pass an OpenAPI file path as the first argument to override the input without editing the config. (kubb v5.0.4)
+
+Kubb CLI v5.0.4
+ℹ Config loaded kubb.config.ts
+✓ Config loaded successfully kubb.config.ts
+Generation started ./openapi.json
+Generating plugin-ts
+Generating plugin-axios
+Generating plugin-react-query
+Generating plugin-barrel
+plugin-barrel completed in 0ms
+plugin-ts completed in 29ms
+plugin-axios completed in 29ms
+plugin-react-query completed in 29ms
+Writing 53 files
+Writing src/gen/index.ts
+Writing src/gen/hooks/index.ts
+Writing src/gen/.kubb/client.ts
+Writing src/gen/models/index.ts
+Writing src/gen/clients/index.ts
+Writing src/gen/models/Register.ts
+Writing src/gen/clients/register.ts
+Writing src/gen/models/GetTokens.ts
+Writing src/gen/.kubb/serializers.ts
+Writing src/gen/models/TokenDtoV1.ts
+Writing src/gen/clients/getTokens.ts
+Writing src/gen/models/DeviceDtoV1.ts
+Writing src/gen/models/GetBalances.ts
+Writing src/gen/models/GetTransfers.ts
+Writing src/gen/models/GetNextNonce.ts
+Writing src/gen/clients/getBalances.ts
+Writing src/gen/.kubb/standardSchema.ts
+Writing src/gen/models/TxSubmitDtoV1.ts
+Writing src/gen/models/MempoolResult.ts
+Writing src/gen/clients/getTransfers.ts
+Writing src/gen/clients/getNextNonce.ts
+Writing src/gen/models/ReceiveWebhook.ts
+Writing src/gen/clients/receiveWebhook.ts
+Writing src/gen/hooks/deviceAPIV1/index.ts
+Writing src/gen/hooks/walletAPIV1/index.ts
+Writing src/gen/models/SubmitTransaction.ts
+Writing src/gen/models/GetTokenByAddress.ts
+Writing src/gen/models/WalletBalanceDtoV1.ts
+Writing src/gen/clients/submitTransaction.ts
+Writing src/gen/clients/getTokenByAddress.ts
+Writing src/gen/models/UnifiedTransferDtoV1.ts
+Writing src/gen/hooks/nodeWebhookApiV1/index.ts
+Writing src/gen/models/UnifiedTransferPageDtoV1.ts
+Writing src/gen/models/GetMempoolRecommendedFees.ts
+Writing src/gen/hooks/deviceAPIV1/useRegisterHook.ts
+Writing src/gen/clients/getMempoolRecommendedFees.ts
+Writing src/gen/models/MempoolRecommendedFeesDtoV1.ts
+Writing src/gen/hooks/walletAPIV1/useGetTokensHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetBalancesHook.ts
+Writing src/gen/models/DeviceRegistrationRequestDtoV1.ts
+Writing src/gen/hooks/walletAPIV1/useGetTransfersHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetNextNonceHook.ts
+Writing src/gen/models/MempoolRecommendedFeesLevelDtoV1.ts
+Writing src/gen/hooks/walletAPIV1/useSubmitTransactionHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetTokensSuspenseHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetTokenByAddressHook.ts
+Writing src/gen/hooks/nodeWebhookApiV1/useReceiveWebhookHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetBalancesSuspenseHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetTransfersSuspenseHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetNextNonceSuspenseHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetTokenByAddressSuspenseHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetMempoolRecommendedFeesHook.ts
+Writing src/gen/hooks/walletAPIV1/useGetMempoolRecommendedFeesSuspenseHook.ts
+Files written successfully
+Generation completed
+
+ Plugins  4 passed (4)
+   Files  53 generated
+Duration  177ms
+  Output  /home/andrej/Projects/goldenera/goldenera-wallet/frontend/packages/api/src/gen
+✓ Generation succeeded ./openapi.json

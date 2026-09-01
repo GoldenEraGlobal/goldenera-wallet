@@ -1,0 +1,16 @@
+{
+  "mode": "MAINNET_READ_ONLY",
+  "tokenCount": 1,
+  "availableDecimals": [
+    8
+  ],
+  "usedPublicWatchAddress": true,
+  "balances": 1,
+  "firstPageCount": 1,
+  "secondPageCount": 0,
+  "browserReadCount": 5,
+  "localRegistrationSuppressed": 1,
+  "realTransactions": 0,
+  "submitAttempts": 0,
+  "forwardedWrites": 0
+}

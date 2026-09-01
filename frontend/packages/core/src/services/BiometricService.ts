@@ -2,279 +2,222 @@ import { NativeBiometric } from '@capgo/capacitor-native-biometric'
 import { BiometricUtil, type BiometricType } from '../utils/BiometricUtil'
 import { bufferToHex, hexToBuffer } from '../utils/CryptoUtil'
 import { StorageService } from './StorageService'
+import { WalletVaultService, withWalletMutation } from './WalletVaultService'
 
-const KEYS = {
-  ENABLED: 'biometric_enabled',
-  CREDENTIAL_ID: 'biometric_credential_id',
-  ENCRYPTED_PASSWORD: 'biometric_encrypted_password',
+const KEYS = { ENABLED: 'biometric_enabled', CREDENTIAL_ID: 'biometric_credential_id', ENCRYPTED_PASSWORD: 'biometric_encrypted_password', PRF: 'biometric_prf_v2' }
+const SERVER_ID = 'wallet.goldenera.global'
+const SCHEME = 'webauthn-prf-hkdf-sha256-aes256gcm'
+
+export interface BiometricContext {
+  vaultId: string
+  vaultRevision: number
+  signal?: AbortSignal
+  isCurrent?: () => boolean
+}
+interface PrfEnvelope {
+  version: 2
+  scheme: typeof SCHEME
+  walletId: string
+  vaultRevision: number
+  rpId: string
+  credentialId: string
+  prfInput: string
+  salt: string
+  iv: string
+  data: string
+}
+type PrfOutputs = AuthenticationExtensionsClientOutputs & { prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } } }
+
+const random = (length: number) => window.crypto.getRandomValues(new Uint8Array(length))
+const hex = (value: unknown, bytes?: number): value is string => typeof value === 'string' && /^[0-9a-f]+$/i.test(value) && value.length % 2 === 0 && (bytes === undefined || value.length === bytes * 2)
+const aad = (value: PrfEnvelope) => new TextEncoder().encode(JSON.stringify([value.version, value.scheme, value.walletId, value.vaultRevision, value.rpId, value.credentialId, value.prfInput, value.salt]))
+const assertCurrent = (context: BiometricContext) => {
+  if (context.signal?.aborted || context.isCurrent?.() === false) throw new Error('Wallet session changed. Retry authentication.')
+}
+const matches = (envelope: PrfEnvelope, context: BiometricContext) => envelope.walletId === context.vaultId && envelope.vaultRevision === context.vaultRevision && envelope.rpId === window.location.hostname
+
+function parseEnvelope(value: unknown): PrfEnvelope | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Partial<PrfEnvelope>
+  if (record.version !== 2 || record.scheme !== SCHEME || typeof record.walletId !== 'string' || typeof record.rpId !== 'string' ||
+    !Number.isSafeInteger(record.vaultRevision) || !hex(record.credentialId) || !hex(record.prfInput, 32) || !hex(record.salt, 32) || !hex(record.iv, 12) || !hex(record.data)) return null
+  return record as PrfEnvelope
 }
 
-const SERVER_ID = 'wallet.goldenera.global'
+function prfOutput(credential: PublicKeyCredential): Uint8Array | null {
+  const output = (credential.getClientExtensionResults() as PrfOutputs).prf?.results?.first
+  return output instanceof ArrayBuffer && output.byteLength === 32 ? new Uint8Array(output) : null
+}
 
-/**
- * BiometricService - Unified biometric authentication service.
- * Handles Native (Android/iOS) and Web (WebAuthn) platforms.
- */
-export const BiometricService = {
-  /**
-   * Checks if biometric authentication is available.
-   */
-  async isAvailable(): Promise<boolean> {
-    const platform = BiometricUtil.getPlatform()
-
-    if (platform !== 'web') {
-      try {
-        const result = await NativeBiometric.isAvailable()
-        return result.isAvailable
-      } catch {
-        return false
-      }
-    }
-
-    if (!BiometricUtil.isWebAuthnAvailable()) return false
-
-    try {
-      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-    } catch {
-      return false
-    }
-  },
-
-  /**
-   * Gets the specific type of biometry supported by the device.
-   */
-  async getType(): Promise<BiometricType> {
-    const platform = BiometricUtil.getPlatform()
-
-    if (platform !== 'web') {
-      try {
-        const result = await NativeBiometric.isAvailable()
-        if (!result.isAvailable || !result.biometryType) return 'none'
-
-        switch (result.biometryType) {
-          case 1: // TOUCH_ID
-          case 3: // FINGERPRINT
-            return 'fingerprint'
-          case 2: // FACE_ID
-          case 4: // FACE_AUTHENTICATION
-            return 'face'
-          case 5: // IRIS_AUTHENTICATION
-            return 'iris'
-          default:
-            return 'fingerprint'
-        }
-      } catch {
-        return 'none'
-      }
-    }
-
-    const available = await this.isAvailable()
-    return available ? 'fingerprint' : 'none'
-  },
-
-  /**
-   * Authenticates user and retrieves stored password.
-   */
-  async authenticate(): Promise<{ success: boolean; password?: string }> {
-    const platform = BiometricUtil.getPlatform()
-    const basicStorage = StorageService.basic
-
-    if (platform !== 'web') {
-      try {
-        console.log('[BiometricService] verifyIdentity starting')
-        await NativeBiometric.verifyIdentity({
-          reason: 'Authenticate to unlock your wallet',
-          title: 'GoldenEra Wallet',
-          subtitle: 'Use biometrics to unlock',
-          description: 'Place your finger on the sensor or look at the camera',
-        })
-        console.log('[BiometricService] verifyIdentity success')
-
-        const credentials = await NativeBiometric.getCredentials({
-          server: SERVER_ID,
-        })
-        console.log('[BiometricService] getCredentials success', { hasPassword: !!credentials.password })
-
-        return { success: true, password: credentials.password }
-      } catch (error) {
-        console.error('[BiometricService] Native biometric auth failed:', error)
-        return { success: false }
-      }
-    }
-
-    if (!BiometricUtil.isWebAuthnAvailable()) return { success: false }
-
-    try {
-      const storedCredentialId = await basicStorage.getItem<string>(KEYS.CREDENTIAL_ID)
-      const encryptedPasswordData = await basicStorage.getItem<any>(KEYS.ENCRYPTED_PASSWORD)
-
-      if (!storedCredentialId || !encryptedPasswordData) return { success: false }
-
-      const challenge = window.crypto.getRandomValues(new Uint8Array(32))
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          timeout: 60000,
-          userVerification: 'required',
-          rpId: window.location.hostname,
-          allowCredentials: [{
-            id: hexToBuffer(storedCredentialId) as any,
-            type: 'public-key',
-          }],
-        }
-      }) as PublicKeyCredential | null
-
-      if (!credential) return { success: false }
-
-      const key = await this.deriveKeyFromCredential(credential.rawId)
-
-      const iv = hexToBuffer(encryptedPasswordData.iv)
-      const data = hexToBuffer(encryptedPasswordData.data)
-
-      const decrypted = await window.crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: iv as any },
-        key,
-        data as any
-      )
-
-      return { success: true, password: new TextDecoder().decode(decrypted) }
-    } catch (error) {
-      console.error('Web biometric auth failed:', error)
-      return { success: false }
-    }
-  },
-
-  /**
-   * Enables biometrics by creating a credential and storing redacted password.
-   */
-  async enable(password: string): Promise<boolean> {
-    const platform = BiometricUtil.getPlatform()
-    const basicStorage = StorageService.basic
-
-    if (platform !== 'web') {
-      try {
-        const randomId = bufferToHex(window.crypto.getRandomValues(new Uint8Array(4)))
-        await NativeBiometric.setCredentials({
-          username: `ge_wallet_user_${randomId}`,
-          password: password,
-          server: SERVER_ID,
-        })
-
-        await basicStorage.setItem(KEYS.ENABLED, true)
-        return true
-      } catch (error) {
-        console.error('Failed to set native credentials:', error)
-        return false
-      }
-    }
-
-    if (!BiometricUtil.isWebAuthnAvailable()) return false
-
-    try {
-      const challenge = window.crypto.getRandomValues(new Uint8Array(32))
-      const userId = window.crypto.getRandomValues(new Uint8Array(16))
-
-      const randomId = bufferToHex(window.crypto.getRandomValues(new Uint8Array(4)))
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'GoldenEra Wallet', id: window.location.hostname },
-          user: { id: userId, name: `ge_wallet_user_${randomId}`, displayName: `GoldenEra Wallet User (${randomId})` },
-          pubKeyCredParams: [
-            { alg: -7, type: 'public-key' },  // ES256
-            { alg: -257, type: 'public-key' }, // RS256
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required',
-          },
-          timeout: 60000,
-        }
-      }) as PublicKeyCredential | null
-
-      if (!credential) return false
-
-      const key = await this.deriveKeyFromCredential(credential.rawId)
-
-      const iv = window.crypto.getRandomValues(new Uint8Array(12))
-      const encrypted = await window.crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv as any },
-        key,
-        new TextEncoder().encode(password)
-      )
-
-      const encryptedPasswordData = {
-        iv: bufferToHex(iv),
-        data: bufferToHex(encrypted),
-      }
-
-      await basicStorage.setItem(KEYS.CREDENTIAL_ID, bufferToHex(credential.rawId))
-      await basicStorage.setItem(KEYS.ENCRYPTED_PASSWORD, encryptedPasswordData)
-      await basicStorage.setItem(KEYS.ENABLED, true)
-
-      return true
-    } catch (error) {
-      console.error('Failed to enable web biometrics:', error)
-      return false
-    }
-  },
-
-  /**
-   * Disables biometrics and wipes stored data.
-   */
-  async disable(): Promise<void> {
-    const platform = BiometricUtil.getPlatform()
-    const basicStorage = StorageService.basic
-
-    if (platform !== 'web') {
-      try {
-        await NativeBiometric.deleteCredentials({ server: SERVER_ID })
-      } catch { }
-    }
-
-    await basicStorage.removeItem(KEYS.ENABLED)
-    await basicStorage.removeItem(KEYS.CREDENTIAL_ID)
-    await basicStorage.removeItem(KEYS.ENCRYPTED_PASSWORD)
-  },
-
-  /**
-   * Checks if biometric is currently active for this wallet.
-   */
-  async isEnabled(): Promise<boolean> {
-    const basicStorage = StorageService.basic
-    const enabled = await basicStorage.getItem<boolean>(KEYS.ENABLED)
-
-    if (BiometricUtil.getPlatform() === 'web') {
-      const credentialId = await basicStorage.getItem<string>(KEYS.CREDENTIAL_ID)
-      return enabled === true && !!credentialId
-    }
-
-    return enabled === true
-  },
-
-  /**
-   * Internal helper to derive key from credential ID with 600,000 PBKDF2 iterations.
-   */
-  async deriveKeyFromCredential(credentialId: ArrayBuffer): Promise<CryptoKey> {
-    const keyMaterial = await window.crypto.subtle.importKey(
-      'raw',
-      credentialId,
-      { name: 'PBKDF2' },
-      false,
-      ['deriveKey']
-    )
-
-    return window.crypto.subtle.deriveKey(
-      {
-        name: 'PBKDF2',
-        salt: new Uint8Array(credentialId.slice(0, 16)) as any,
-        iterations: 600000,
-        hash: 'SHA-256',
-      },
-      keyMaterial,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    )
+async function wrappingKey(secret: Uint8Array, salt: string): Promise<CryptoKey> {
+  try {
+    const material = await window.crypto.subtle.importKey('raw', secret as BufferSource, 'HKDF', false, ['deriveKey'])
+    return await window.crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: hexToBuffer(salt) as BufferSource, info: new TextEncoder().encode('goldenera-wallet/prf/v2/password') }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+  } finally {
+    secret.fill(0)
   }
+}
+
+function validateClientData(credential: PublicKeyCredential, challenge: Uint8Array, type: 'webauthn.create' | 'webauthn.get') {
+  const data = JSON.parse(new TextDecoder().decode(credential.response.clientDataJSON)) as { type?: string; challenge?: string; origin?: string; crossOrigin?: boolean }
+  const expected = btoa(String.fromCharCode(...challenge)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  if (data.type !== type || data.challenge !== expected || data.origin !== window.location.origin || data.crossOrigin === true) throw new Error('Invalid authenticator response')
+}
+
+async function assertion(credentialId: string, context: BiometricContext, prfInput?: string): Promise<PublicKeyCredential> {
+  assertCurrent(context)
+  const challenge = random(32)
+  const credential = await navigator.credentials.get({
+    signal: context.signal,
+    publicKey: {
+      challenge,
+      rpId: window.location.hostname,
+      timeout: 60000,
+      userVerification: 'required',
+      allowCredentials: [{ id: hexToBuffer(credentialId) as BufferSource, type: 'public-key' }],
+      ...(prfInput ? { extensions: { prf: { eval: { first: hexToBuffer(prfInput) } } } as AuthenticationExtensionsClientInputs } : {}),
+    },
+  }) as PublicKeyCredential | null
+  assertCurrent(context)
+  if (!credential || bufferToHex(credential.rawId) !== credentialId.toLowerCase()) throw new Error('Wrong authenticator credential')
+  validateClientData(credential, challenge, 'webauthn.get')
+  const authData = new Uint8Array((credential.response as AuthenticatorAssertionResponse).authenticatorData)
+  const rpHash = bufferToHex(await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(window.location.hostname)))
+  if (authData.length < 37 || (authData[32] & 5) !== 5 || bufferToHex(authData.slice(0, 32)) !== rpHash) throw new Error('User verification was not completed')
+  return credential
+}
+
+async function decryptEnvelope(envelope: PrfEnvelope, key: CryptoKey): Promise<string> {
+  const decrypted = await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: hexToBuffer(envelope.iv) as BufferSource, additionalData: aad(envelope) }, key, hexToBuffer(envelope.data) as BufferSource)
+  return new TextDecoder().decode(decrypted)
+}
+
+export const BiometricService = {
+  async isAvailable(): Promise<boolean> {
+    if (BiometricUtil.getPlatform() !== 'web') {
+      try { return (await NativeBiometric.isAvailable()).isAvailable } catch { return false }
+    }
+    if (!BiometricUtil.isWebAuthnAvailable()) return false
+    try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable() } catch { return false }
+  },
+
+  async getType(): Promise<BiometricType> {
+    if (BiometricUtil.getPlatform() !== 'web') {
+      try {
+        const result = await NativeBiometric.isAvailable()
+        if (!result.isAvailable) return 'none'
+        if (result.biometryType === 2 || result.biometryType === 4) return 'face'
+        if (result.biometryType === 5) return 'iris'
+        return 'fingerprint'
+      } catch { return 'none' }
+    }
+    return await this.isAvailable() ? 'fingerprint' : 'none'
+  },
+
+  async hasLegacy(): Promise<boolean> {
+    if (BiometricUtil.getPlatform() !== 'web') return false
+    return await StorageService.basic.getItem(KEYS.CREDENTIAL_ID) !== null || await StorageService.basic.getItem(KEYS.ENCRYPTED_PASSWORD) !== null
+  },
+
+  async isEnabled(context: BiometricContext): Promise<boolean> {
+    if (BiometricUtil.getPlatform() !== 'web') return await StorageService.basic.getItem(KEYS.ENABLED) === true
+    const envelope = parseEnvelope(await StorageService.basic.getItem(KEYS.PRF))
+    return !!envelope && matches(envelope, context)
+  },
+
+  async authenticate(context: BiometricContext): Promise<{ success: boolean; password?: string }> {
+    assertCurrent(context)
+    if (BiometricUtil.getPlatform() !== 'web') {
+      await NativeBiometric.verifyIdentity({ reason: 'Authenticate to unlock your wallet', title: 'GoldenEra Wallet' })
+      const credentials = await NativeBiometric.getCredentials({ server: SERVER_ID })
+      assertCurrent(context)
+      return { success: true, password: credentials.password }
+    }
+    const envelope = parseEnvelope(await StorageService.basic.getItem(KEYS.PRF))
+    if (!envelope || !matches(envelope, context)) return { success: false }
+    const credential = await assertion(envelope.credentialId, context, envelope.prfInput)
+    const secret = prfOutput(credential)
+    if (!secret) throw new Error('This authenticator cannot unlock the wallet securely. Use your password.')
+    const key = await wrappingKey(secret, envelope.salt)
+    const password = await decryptEnvelope(envelope, key)
+    assertCurrent(context)
+    return { success: true, password }
+  },
+
+  async enable(password: string, context: BiometricContext): Promise<boolean> {
+    assertCurrent(context)
+    if (BiometricUtil.getPlatform() !== 'web') {
+      await NativeBiometric.setCredentials({ username: 'goldenera-wallet', password, server: SERVER_ID })
+      await StorageService.basic.setItem(KEYS.ENABLED, true)
+      return true
+    }
+    if (!BiometricUtil.isWebAuthnAvailable()) return false
+    const challenge = random(32)
+    const prfInput = random(32)
+    const credential = await navigator.credentials.create({
+      signal: context.signal,
+      publicKey: {
+        challenge,
+        rp: { name: 'GoldenEra Wallet', id: window.location.hostname },
+        user: { id: random(32), name: `wallet-${context.vaultId}`, displayName: 'GoldenEra Wallet' },
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        timeout: 60000,
+        extensions: { prf: { eval: { first: prfInput } } } as AuthenticationExtensionsClientInputs,
+      },
+    }) as PublicKeyCredential | null
+    assertCurrent(context)
+    if (!credential) return false
+    validateClientData(credential, challenge, 'webauthn.create')
+    if ((credential.getClientExtensionResults() as PrfOutputs).prf?.enabled !== true) return false
+    const credentialId = bufferToHex(credential.rawId)
+    const secret = prfOutput(credential) ?? prfOutput(await assertion(credentialId, context, bufferToHex(prfInput)))
+    if (!secret) return false
+    const envelope: PrfEnvelope = {
+      version: 2, scheme: SCHEME, walletId: context.vaultId, vaultRevision: context.vaultRevision,
+      rpId: window.location.hostname, credentialId, prfInput: bufferToHex(prfInput), salt: bufferToHex(random(32)), iv: bufferToHex(random(12)), data: '',
+    }
+    const key = await wrappingKey(secret, envelope.salt)
+    envelope.data = bufferToHex(await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv: hexToBuffer(envelope.iv) as BufferSource, additionalData: aad(envelope) }, key, new TextEncoder().encode(password)))
+    await withWalletMutation(async () => {
+      assertCurrent(context)
+      const vault = await WalletVaultService.read()
+      if (!vault || vault.id !== context.vaultId || vault.revision !== context.vaultRevision || !await WalletVaultService.decrypt(vault, password)) throw new Error('Wallet changed during biometric enrollment')
+      assertCurrent(context)
+      await StorageService.basic.setItem(KEYS.PRF, envelope)
+      const persisted = parseEnvelope(await StorageService.basic.getItem(KEYS.PRF))
+      if (!persisted || !matches(persisted, context) || await decryptEnvelope(persisted, key) !== password) throw new Error('Biometric persistence verification failed')
+      assertCurrent(context)
+      await this.removeLegacy()
+    })
+    return true
+  },
+
+  /** The only credential-ID decryption path: explicit one-time legacy recovery. */
+  async recoverLegacyForMigration(context: BiometricContext): Promise<string> {
+    if (BiometricUtil.getPlatform() !== 'web') throw new Error('Legacy recovery is only available for an existing web wallet')
+    const credentialId = await StorageService.basic.getItem<string>(KEYS.CREDENTIAL_ID)
+    const encrypted = await StorageService.basic.getItem<{ iv: string; data: string }>(KEYS.ENCRYPTED_PASSWORD)
+    if (!hex(credentialId) || !encrypted || !hex(encrypted.iv, 12) || !hex(encrypted.data)) throw new Error('Legacy recovery is incomplete. Use your password or recovery phrase.')
+    await assertion(credentialId, context)
+    // Compatibility only after real user verification; never used by authenticate.
+    const id = hexToBuffer(credentialId)
+    const material = await window.crypto.subtle.importKey('raw', id as BufferSource, 'PBKDF2', false, ['deriveKey'])
+    const key = await window.crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', iterations: 600000, salt: id.slice(0, 16) as BufferSource }, material, { name: 'AES-GCM', length: 256 }, false, ['decrypt'])
+    const password = new TextDecoder().decode(await window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: hexToBuffer(encrypted.iv) as BufferSource }, key, hexToBuffer(encrypted.data) as BufferSource))
+    assertCurrent(context)
+    return password
+  },
+
+  async removeLegacy(): Promise<void> {
+    await StorageService.basic.removeItem(KEYS.ENCRYPTED_PASSWORD)
+    await StorageService.basic.removeItem(KEYS.CREDENTIAL_ID)
+    await StorageService.basic.removeItem(KEYS.ENABLED)
+  },
+
+  async disable(): Promise<void> {
+    if (BiometricUtil.getPlatform() !== 'web') await NativeBiometric.deleteCredentials({ server: SERVER_ID })
+    await StorageService.basic.removeItem(KEYS.PRF)
+    await this.removeLegacy()
+  },
 }

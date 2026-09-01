@@ -1,6 +1,6 @@
-import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@project/ui"
-import { Download, Plus, Wallet } from "lucide-react"
-import { useFlow } from "../router/useFlow"
+import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@project/ui'
+import { Download, Plus, Wallet } from 'lucide-react'
+import { useFlow } from '../router/useFlow'
 
 export const WelcomeCard = () => {
     const { push } = useFlow()

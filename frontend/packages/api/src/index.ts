@@ -1,3 +1,3 @@
-export * from './client';
-export * from './gen';
+export * from './client'
+export * from './gen'
 

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { useCopyToClipboard } from "usehooks-ts"
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCopyToClipboard } from 'usehooks-ts'
 
 export const useCopy = () => {
     const [_, _copy] = useCopyToClipboard()
     const [copied, setCopied] = useState(false)
-    const copiedTimeout = useRef<NodeJS.Timeout | null>(null)
+    const copiedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     useEffect(() => {
         return () => {

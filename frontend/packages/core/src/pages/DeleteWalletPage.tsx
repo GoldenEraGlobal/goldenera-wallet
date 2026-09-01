@@ -9,7 +9,7 @@ import {
     PasswordInput,
     Spinner
 } from '@project/ui'
-import { ActivityComponentType } from '@stackflow/react'
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertTriangle, ChevronLeft, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -26,7 +26,7 @@ type DeleteForm = z.infer<typeof deleteSchema>
 
 type Step = 'warning' | 'confirm'
 
-export const DeleteWalletPage: ActivityComponentType = () => {
+export const DeleteWalletPage: ActivityComponentType<'DeleteWalletPage'> = () => {
     const { pop } = useFlow()
     const resetWallet = useWalletStore((state) => state.resetWallet)
     const checkPassword = useWalletStore((state) => state.checkPassword)
@@ -172,7 +172,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 <PasswordInput
                                     placeholder="Enter your password"
                                     {...form.register('password')}
-                                    disabled={form.formState.disabled || form.formState.isLoading}
+                                    disabled={form.formState.disabled || form.formState.isSubmitting}
                                 />
                                 {form.formState.errors.password?.message && (
                                     <FieldError>{form.formState.errors.password.message}</FieldError>
@@ -184,11 +184,11 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 variant="destructive"
                                 size="lg"
                                 className="w-full"
-                                disabled={form.formState.disabled || form.formState.isLoading || !form.formState.isValid}
+                                disabled={form.formState.disabled || form.formState.isSubmitting || !form.formState.isValid}
                                 onClick={form.handleSubmit(handleDelete)}
                             >
-                                {form.formState.isLoading && <Spinner />}
-                                {form.formState.isLoading ? 'Deleting...' : 'Delete Wallet Permanently'}
+                                {form.formState.isSubmitting && <Spinner />}
+                                {form.formState.isSubmitting ? 'Deleting...' : 'Delete Wallet Permanently'}
                             </Button>
 
                             <Button
@@ -197,7 +197,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 size="lg"
                                 className="gap-1 mx-auto"
                                 onClick={handleBack}
-                                disabled={form.formState.disabled || form.formState.isLoading}
+                                disabled={form.formState.disabled || form.formState.isSubmitting}
                             >
                                 <ChevronLeft className="h-4 w-4" />
                                 Go Back

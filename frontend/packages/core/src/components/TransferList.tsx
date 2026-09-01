@@ -1,6 +1,7 @@
 import { NATIVE_TOKEN } from '@goldenera/cryptoj'
+import type {
+    GetTransfersTransferTypeKey} from '@project/api'
 import {
-    GetTransfersQueryParamsTransferTypeEnumKey,
     useGetTransfersHook,
     type UnifiedTransferDtoV1,
 } from '@project/api'
@@ -27,7 +28,7 @@ import {
 } from '@project/ui'
 import { keepPreviousData } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Clock, RefreshCw } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import scrollIntoView from 'scroll-into-view-if-needed'
 import { useWalletStore } from '../store/WalletStore'
 import { formatTransferType, formatWei } from '../utils/WalletUtil'
@@ -60,7 +61,7 @@ interface TransferListProps {
     tokenAddress?: string
     tokenDecimals?: number
     pageSize?: number
-    transferType?: GetTransfersQueryParamsTransferTypeEnumKey
+    transferType?: GetTransfersTransferTypeKey
 }
 
 type TransferDirection = 'received' | 'sent' | 'self'
@@ -149,26 +150,32 @@ function TransferItem({
     )
 }
 
-export function TransferList({
+export function TransferList(props: TransferListProps) {
+    const address = useWalletStore(state => state.address)
+    const identity = JSON.stringify([address?.toLowerCase(), (props.tokenAddress ?? NATIVE_TOKEN).toLowerCase(), props.transferType ?? null, props.pageSize ?? 15])
+    return <TransferListPage key={identity} {...props} address={address} />
+}
+
+function TransferListPage({
     tokenAddress = NATIVE_TOKEN,
     tokenDecimals = 8,
     pageSize = 15,
     transferType,
-}: TransferListProps) {
-    const address = useWalletStore((state) => state.address)
+    address,
+}: TransferListProps & { address: string | null }) {
     const [pageNumber, setPageNumber] = useState(0)
     const topEl = useRef<HTMLDivElement>(null)
     const [openedTransfer, setOpenedTransfer] = useState<UnifiedTransferDtoV1 | null>(null)
 
     // Fetch transfers
-    const { data: transfersPage, isLoading, refetch } = useGetTransfersHook(
-        {
+    const { data: transfersPage, isLoading, isPlaceholderData, refetch } = useGetTransfersHook(
+        { query: {
             addresses: address ? [address] : [],
             tokenAddresses: [tokenAddress],
             pageNumber,
             pageSize,
             transferType
-        },
+        } },
         {
             query: {
                 enabled: !!address,
@@ -190,6 +197,13 @@ export function TransferList({
     const totalElements = transfersPage?.totalElements || 0
     const pendingCount = transfersPage?.pendingCount || 0
 
+    // Polling may shrink the result set while the user is on a later page.
+    const lastPage = Math.max(0, totalPages - 1)
+    const isOutOfRange = !isPlaceholderData && !!transfersPage && pageNumber > lastPage
+    useEffect(() => {
+        if (isOutOfRange) setPageNumber(lastPage)
+    }, [isOutOfRange, lastPage])
+
     // Determine if transfer is incoming or outgoing
     const getTransferDirection = (transfer: UnifiedTransferDtoV1): TransferDirection => {
         const userAddr = address?.toLowerCase()
@@ -204,7 +218,7 @@ export function TransferList({
     const handlePageChange = (newPage: number) => {
         if (newPage >= 0 && newPage < totalPages) {
             setPageNumber(newPage)
-            scrollIntoView(topEl.current!, {
+            if (topEl.current) scrollIntoView(topEl.current, {
                 scrollMode: 'always',
                 block: 'start',
                 inline: 'start',
@@ -231,7 +245,7 @@ export function TransferList({
             </div>
 
 
-            {isLoading ? (
+            {isLoading || isOutOfRange ? (
                 <ItemGroup className="gap-4">
                     {[1, 2, 3].map((i) => (
                         <Skeleton key={i} className="h-16" />
@@ -263,6 +277,10 @@ export function TransferList({
                         ))}
                     </ItemGroup>
 
+
+                </>
+            )}
+
                     {totalPages > 1 && (
                         <Pagination className="mt-4">
                             <PaginationContent className="gap-1">
@@ -288,8 +306,6 @@ export function TransferList({
                             </PaginationContent>
                         </Pagination>
                     )}
-                </>
-            )}
 
             <TransferDetail
                 transfer={openedTransfer}

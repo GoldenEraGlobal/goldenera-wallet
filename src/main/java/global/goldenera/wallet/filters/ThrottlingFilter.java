@@ -59,7 +59,13 @@ public class ThrottlingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String path = request.getRequestURI();
+        String path;
+        try {
+            path = throttlingService.getRequestPath(request);
+        } catch (IllegalArgumentException exception) {
+            response.sendError(HttpStatus.BAD_REQUEST.value(), "Invalid request path");
+            return;
+        }
         if (path.startsWith("/api")) {
             String limitKey = request.getRemoteAddr();
             if (!throttlingService.checkSpecificLimit(request, limitKey)) {

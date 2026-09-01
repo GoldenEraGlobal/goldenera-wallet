@@ -25,7 +25,6 @@ package global.goldenera.wallet.api.core.v1.webhook;
 
 import static lombok.AccessLevel.PRIVATE;
 
-import java.io.IOException;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -36,8 +35,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import global.goldenera.wallet.api.core.v1.webhook.dtos.WebhookEventDtoV1;
 import global.goldenera.wallet.client.node.model.v1.BlockchainBlockHeaderDtoV1;
@@ -73,7 +73,7 @@ public class NodeWebhookApiV1 {
         } catch (GERuntimeException e) {
             log.warn("Security check failed: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid signature");
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             log.error("Deserialization failed", e);
             return ResponseEntity.badRequest().body("Invalid JSON structure");
         }

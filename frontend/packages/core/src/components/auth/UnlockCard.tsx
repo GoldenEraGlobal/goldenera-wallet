@@ -66,8 +66,9 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
         try {
             const result = await checkPassword(data.password)
             if (result) {
-                await useWalletStore.getState().retireLegacyWithPassword(data.password)
+                const warning = await useWalletStore.getState().retireLegacyWithPassword(data.password)
                 await onSuccess({ password: data.password, mnemonic: result })
+                if (warning) useWalletStore.setState({ error: warning })
                 return
             }
             form.setError('password', {
@@ -75,10 +76,10 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
                 message: 'Invalid password',
             })
             onFailed?.()
-        } catch {
+        } catch (error) {
             form.setError('password', {
                 type: 'manual',
-                message: 'Failed to unlock',
+                message: error instanceof Error ? error.message : 'Failed to unlock',
             })
             onFailed?.()
         } finally {

@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@project/ui'
+import { Alert, AlertDescription, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
 import { LegacyBiometricMigration } from '../components/auth/LegacyBiometricMigration'
 import { UnlockWallet } from '../components/auth/UnlockWallet'
@@ -19,7 +19,11 @@ export const WelcomePage: ActivityComponentType<'WelcomePage'> = () => {
           <CardContent><Button className="w-full" onClick={() => void initialize()}>Retry loading wallet</Button></CardContent>
         </Card>
       ) : status === 'no_wallet' ? <WelcomeCard /> : (
-        <div className="w-full space-y-4"><UnlockWallet /><LegacyBiometricMigration /></div>
+        <div className="w-full space-y-4">
+          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+          <UnlockWallet />
+          <LegacyBiometricMigration />
+        </div>
       )}
     </BasicLayout>
   )

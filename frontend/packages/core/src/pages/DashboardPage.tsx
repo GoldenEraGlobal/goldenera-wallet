@@ -2,6 +2,8 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  Alert,
+  AlertDescription,
   Badge,
   Button,
   Card,
@@ -31,6 +33,8 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
   const { push } = useFlow()
   const address = useWalletStore((state) => state.address)
   const lockWallet = useWalletStore((state) => state.lockWallet)
+  const error = useWalletStore((state) => state.error)
+  const clearError = useWalletStore((state) => state.clearError)
   const supportedScan = useBarcodeIsSupported()
 
   const handleLock = () => {
@@ -75,6 +79,14 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
     >
       {/* Main Content */}
       <div className="flex-1 space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <Button type="button" variant="ghost" size="sm" onClick={clearError}>Dismiss</Button>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Total Value Card */}
         <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
           <CardContent className="text-center space-y-4 py-6">

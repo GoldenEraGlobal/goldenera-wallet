@@ -103,7 +103,7 @@ for (const scenario of cases) test(`forward upgrade preserves access: ${scenario
       password = 'PUBLIC-Upgraded-Password-456!'
       await page.getByPlaceholder('New wallet password', { exact: true }).fill(password)
       await page.getByPlaceholder('Confirm new wallet password', { exact: true }).fill(password)
-      await page.getByRole('button', { name: 'Save new password and remove old biometrics', exact: true }).click()
+      await page.getByRole('button', { name: 'Save new password and upgrade biometrics', exact: true }).click()
       await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
       expect(assertions).toBeGreaterThan(before)
       expect(await page.evaluate(key => localStorage.getItem(key), legacyKey)).toBeNull()

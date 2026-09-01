@@ -10,28 +10,38 @@ const environment = vi.hoisted(() => ({
   wrongCredential: false,
   password: 'PUBLIC-Test-Only-Password-123!',
   failPersist: false,
+  corruptPrfAfterWrite: false,
+  vaultId: 'public-test-vault',
+  assertionUserHandle: null as Uint8Array | null,
 }))
 vi.mock('../../packages/core/src/utils/BiometricUtil', () => ({ BiometricUtil: { getPlatform: () => 'web', isWebAuthnAvailable: () => true } }))
 vi.mock('../../packages/core/src/services/StorageService', () => ({ StorageService: { basic: {
   getItem: async (key: string) => environment.persisted.get(key) ?? null,
   setItem: async (key: string, value: unknown) => {
     if (environment.failPersist) throw new Error('Synthetic persistence failure')
-    environment.persisted.set(key, structuredClone(value))
+    const stored = structuredClone(value)
+    if (key === 'biometric_prf_v2' && environment.corruptPrfAfterWrite && stored && typeof stored === 'object' && 'data' in stored) {
+      const record = stored as { data: string }
+      record.data = `${record.data.startsWith('00') ? '01' : '00'}${record.data.slice(2)}`
+    }
+    environment.persisted.set(key, stored)
   },
   removeItem: async (key: string) => { environment.persisted.delete(key) },
 } } }))
 vi.mock('../../packages/core/src/services/WalletVaultService', () => ({
   withWalletMutation: (fn: () => Promise<unknown>) => fn(),
   WalletVaultService: {
-    read: async () => ({ id: 'public-test-vault', revision: 0 }),
+    read: async () => ({ id: environment.vaultId, revision: 0 }),
     decrypt: async (_vault: unknown, password: string) => password === environment.password ? 'PUBLIC mnemonic fixture' : null,
   },
 }))
 
 import { BiometricService } from '../../packages/core/src/services/BiometricService'
 const context = { vaultId: 'public-test-vault', vaultRevision: 0 }
+const legacyContext = { vaultId: `legacy-${'ab'.repeat(32)}`, vaultRevision: 0 }
 const credentialId = new Uint8Array(32).fill(7)
 const encoder = new TextEncoder()
+const signalCurrentUserDetails = vi.fn(async () => undefined)
 
 async function credential(options: CredentialCreationOptions | CredentialRequestOptions, creation: boolean): Promise<PublicKeyCredential> {
   const publicKey = options.publicKey!
@@ -49,6 +59,7 @@ async function credential(options: CredentialCreationOptions | CredentialRequest
   const response = {
     clientDataJSON: encoder.encode(JSON.stringify({ type: creation ? 'webauthn.create' : 'webauthn.get', challenge: Buffer.from(challenge).toString('base64url'), origin: window.location.origin })).buffer,
     authenticatorData: authData.buffer,
+    userHandle: creation ? null : environment.assertionUserHandle?.slice().buffer ?? null,
   }
   return {
     rawId: (environment.wrongCredential ? new Uint8Array(32).fill(8) : credentialId).slice().buffer,
@@ -64,12 +75,17 @@ beforeEach(() => {
   environment.verified = true
   environment.wrongCredential = false
   environment.failPersist = false
+  environment.corruptPrfAfterWrite = false
+  environment.vaultId = context.vaultId
+  environment.assertionUserHandle = null
+  signalCurrentUserDetails.mockReset()
+  vi.stubGlobal('PublicKeyCredential', { signalCurrentUserDetails })
   vi.stubGlobal('navigator', { credentials: { create: vi.fn(options => credential(options, true)), get: vi.fn(options => credential(options, false)) } })
 })
 
 describe('PRF-protected password wrapper with real WebCrypto and mocked authenticator', () => {
   it('enrolls, persists only encrypted data and authenticates through PRF', async () => {
-    expect(await BiometricService.enable(environment.password, context)).toBe(true)
+    expect((await BiometricService.enable(environment.password, context)).verified).toBe(true)
     expect(await BiometricService.isEnabled(context)).toBe(true)
     const record = environment.persisted.get('biometric_prf_v2') as Record<string, unknown>
     expect(record.version).toBe(2)
@@ -80,18 +96,100 @@ describe('PRF-protected password wrapper with real WebCrypto and mocked authenti
     expect(navigator.credentials.get).toHaveBeenCalledWith(expect.objectContaining({ publicKey: expect.objectContaining({ userVerification: 'required' }) }))
   })
 
+  it('uses neutral public credential labels and keeps the opaque user handle internal', async () => {
+    environment.vaultId = legacyContext.vaultId
+    expect((await BiometricService.enable(environment.password, legacyContext)).verified).toBe(true)
+    const creation = vi.mocked(navigator.credentials.create).mock.calls[0]![0]!.publicKey!
+    const userId = new Uint8Array(creation.user.id as ArrayBuffer)
+    const persisted = environment.persisted.get('biometric_prf_v2') as Record<string, unknown>
+
+    expect(creation.user.name).toBe('GoldenEra Wallet')
+    expect(creation.user.displayName).toBe('GoldenEra Wallet')
+    expect(creation.user.name).not.toContain('legacy-')
+    expect(creation.user.displayName).not.toContain('legacy-')
+    expect(JSON.stringify({ name: creation.user.name, displayName: creation.user.displayName })).not.toContain(legacyContext.vaultId)
+    expect(userId).toHaveLength(32)
+    expect(persisted.userId).toBe(Buffer.from(userId).toString('base64url'))
+    expect(String(persisted.userId)).not.toContain(legacyContext.vaultId)
+    expect(persisted.walletId).toBe(legacyContext.vaultId)
+  })
+
+  it('derives the same opaque user handle for repeated enrollment of the same vault', async () => {
+    await BiometricService.enable(environment.password, context)
+    const first = new Uint8Array(vi.mocked(navigator.credentials.create).mock.calls[0]![0]!.publicKey!.user.id as ArrayBuffer)
+    await BiometricService.disable()
+    await BiometricService.enable(environment.password, context)
+    const second = new Uint8Array(vi.mocked(navigator.credentials.create).mock.calls[1]![0]!.publicKey!.user.id as ArrayBuffer)
+
+    expect(second).toEqual(first)
+  })
+
+  it('signals neutral labels for new credentials without changing the PRF binding', async () => {
+    await BiometricService.enable(environment.password, context)
+    const record = environment.persisted.get('biometric_prf_v2') as Record<string, unknown>
+    expect((await BiometricService.authenticate(context)).password).toBe(environment.password)
+    await vi.waitFor(() => expect(signalCurrentUserDetails).toHaveBeenCalledWith({
+      rpId: window.location.hostname,
+      userId: record.userId,
+      name: 'GoldenEra Wallet',
+      displayName: 'GoldenEra Wallet',
+    }))
+  })
+
+  it('keeps old envelopes working when their unrecorded user handle cannot be relabeled', async () => {
+    await BiometricService.enable(environment.password, context)
+    const record = environment.persisted.get('biometric_prf_v2') as Record<string, unknown>
+    delete record.userId
+    signalCurrentUserDetails.mockRejectedValueOnce(new Error('unsupported'))
+
+    expect((await BiometricService.authenticate(context)).password).toBe(environment.password)
+    expect(signalCurrentUserDetails).not.toHaveBeenCalled()
+  })
+
+  it('can opportunistically relabel an old envelope when its authenticator returns the user handle', async () => {
+    await BiometricService.enable(environment.password, context)
+    const creation = vi.mocked(navigator.credentials.create).mock.calls[0]![0]!.publicKey!
+    const userId = new Uint8Array(creation.user.id as ArrayBuffer)
+    const record = environment.persisted.get('biometric_prf_v2') as Record<string, unknown>
+    delete record.userId
+    environment.assertionUserHandle = userId
+
+    expect((await BiometricService.authenticate(context)).password).toBe(environment.password)
+    await vi.waitFor(() => expect(signalCurrentUserDetails).toHaveBeenCalledWith(expect.objectContaining({
+      userId: Buffer.from(userId).toString('base64url'),
+      name: 'GoldenEra Wallet',
+      displayName: 'GoldenEra Wallet',
+    })))
+  })
+
+  it('does not let a best-effort label update failure block authentication', async () => {
+    await BiometricService.enable(environment.password, context)
+    signalCurrentUserDetails.mockRejectedValueOnce(new Error('synthetic signal failure'))
+
+    expect((await BiometricService.authenticate(context)).password).toBe(environment.password)
+    await vi.waitFor(() => expect(signalCurrentUserDetails).toHaveBeenCalledTimes(1))
+  })
+
   it('uses a subsequent assertion when create supports PRF but has no output', async () => {
     environment.createOutput = false
-    expect(await BiometricService.enable(environment.password, context)).toBe(true)
+    expect((await BiometricService.enable(environment.password, context)).verified).toBe(true)
     expect(navigator.credentials.get).toHaveBeenCalledTimes(1)
     expect((await BiometricService.authenticate(context)).password).toBe(environment.password)
   })
 
   it('leaves password-only mode when PRF is not available', async () => {
     environment.supported = false
-    expect(await BiometricService.enable(environment.password, context)).toBe(false)
+    expect((await BiometricService.enable(environment.password, context)).verified).toBe(false)
     expect(environment.persisted.has('biometric_prf_v2')).toBe(false)
     expect(await BiometricService.isEnabled(context)).toBe(false)
+  })
+
+  it('rolls back a structurally valid envelope that fails the decrypt readback', async () => {
+    environment.corruptPrfAfterWrite = true
+    await expect(BiometricService.enable(environment.password, context)).rejects.toThrow()
+    expect(environment.persisted.has('biometric_prf_v2')).toBe(false)
+    expect(await BiometricService.isEnabled(context)).toBe(false)
+    expect(await BiometricService.authenticate(context)).toEqual({ success: false })
   })
 
   it('rejects missing user verification, wrong credential and a changed wallet identity', async () => {
@@ -153,7 +251,7 @@ describe('explicit one-time legacy biometric migration', () => {
   it('preserves legacy access if PRF enrollment or persistence fails', async () => {
     await installLegacyWrapper()
     environment.supported = false
-    expect(await BiometricService.enable(environment.password, context)).toBe(false)
+    expect((await BiometricService.enable(environment.password, context)).verified).toBe(false)
     expect(await BiometricService.hasLegacy()).toBe(true)
     environment.supported = true
     environment.failPersist = true

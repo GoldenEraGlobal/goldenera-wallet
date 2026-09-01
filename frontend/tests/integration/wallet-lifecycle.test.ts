@@ -13,6 +13,7 @@ const environment = vi.hoisted(() => ({
   failRead: false,
   failReadAfterWrite: false,
   failCredentialCleanup: false,
+  credentialCleanupFailures: 0,
   noopRemove: false,
   removeGate: null as Promise<void> | null,
   removeStarted: vi.fn(),
@@ -21,6 +22,13 @@ const environment = vi.hoisted(() => ({
   beforeWriteGate: null as Promise<void> | null,
   beforeWriteStarted: vi.fn(),
   register: vi.fn(async () => undefined),
+  biometricEnabled: false,
+  biometricEnableResult: true,
+  biometricEnableError: false,
+  biometricCommitBeforeError: false,
+  biometricEnableGate: null as Promise<void> | null,
+  biometricEnableStarted: vi.fn(),
+  biometricEnable: vi.fn(async () => true),
 }))
 
 vi.mock('@capacitor/preferences', () => ({ Preferences: {
@@ -58,12 +66,34 @@ vi.mock('capacitor-secure-storage-plugin', () => ({ SecureStoragePlugin: {
 vi.mock('../../packages/core/src/services/BiometricService', () => ({ BiometricService: {
   isAvailable: async () => false,
   getType: async () => 'none',
-  isEnabled: async () => false,
+  isEnabled: async () => environment.biometricEnabled,
   hasLegacy: async () => environment.legacy,
   recoverLegacyForMigration: async () => 'PUBLIC-TEST-ONLY_password-123!',
-  removeLegacy: async () => { environment.legacy = false },
+  enable: async () => {
+    environment.biometricEnable()
+    environment.biometricEnableStarted()
+    await environment.biometricEnableGate
+    if (environment.biometricCommitBeforeError) environment.biometricEnabled = true
+    if (environment.biometricEnableError) throw new DOMException('Synthetic biometric enrollment cancellation', 'NotAllowedError')
+    if (!environment.biometricEnableResult) return { verified: false, legacyCleanupComplete: false }
+    environment.biometricEnabled = true
+    if (environment.legacy && (environment.failCredentialCleanup || environment.credentialCleanupFailures > 0)) {
+      if (environment.credentialCleanupFailures > 0) environment.credentialCleanupFailures -= 1
+      return { verified: true, legacyCleanupComplete: false }
+    }
+    environment.legacy = false
+    return { verified: true, legacyCleanupComplete: true }
+  },
+  removeLegacy: async () => {
+    if (environment.failCredentialCleanup || environment.credentialCleanupFailures > 0) {
+      if (environment.credentialCleanupFailures > 0) environment.credentialCleanupFailures -= 1
+      throw new Error('Synthetic credential cleanup failure')
+    }
+    environment.legacy = false
+  },
   disable: async () => {
     if (environment.failCredentialCleanup) throw new Error('Synthetic credential cleanup failure')
+    environment.biometricEnabled = false
     environment.legacy = false
   },
 } }))
@@ -87,6 +117,7 @@ beforeEach(() => {
   environment.failRead = false
   environment.failReadAfterWrite = false
   environment.failCredentialCleanup = false
+  environment.credentialCleanupFailures = 0
   environment.noopRemove = false
   environment.removeGate = null
   environment.removeStarted.mockClear()
@@ -95,6 +126,13 @@ beforeEach(() => {
   environment.beforeWriteGate = null
   environment.beforeWriteStarted.mockClear()
   environment.register.mockReset().mockResolvedValue(undefined)
+  environment.biometricEnabled = false
+  environment.biometricEnableResult = true
+  environment.biometricEnableError = false
+  environment.biometricCommitBeforeError = false
+  environment.biometricEnableGate = null
+  environment.biometricEnableStarted.mockReset()
+  environment.biometricEnable.mockReset().mockResolvedValue(true)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
@@ -132,6 +170,76 @@ describe('wallet lifecycle with real encryption, derivation and Zustand', () => 
     store.getState().lockWallet()
     await store.getState().unlockWallet(result.mnemonic)
     expect(store.getState().status).toBe('unlocked')
+  })
+
+  it('confirms requested biometric enrollment before opening a newly created wallet', async () => {
+    const store = await loadStore()
+    await store.getState().initialize()
+    await store.getState().createWallet(password, true)
+    expect(environment.biometricEnable).toHaveBeenCalledTimes(1)
+    expect(store.getState().status).toBe('backup')
+    expect(store.getState().biometric.enabled).toBe(true)
+    expect(store.getState().error).toBeNull()
+  })
+
+  it('does not silently finish requested biometric enrollment when the authenticator declines it', async () => {
+    environment.biometricEnableResult = false
+    const store = await loadStore()
+    await store.getState().initialize()
+    await expect(store.getState().importWallet(mnemonic, password, true)).rejects.toThrow('could not be enabled or verified')
+    expect(environment.secure.has('ge_secure:mnemonic')).toBe(true)
+    expect(store.getState().status).toBe('locked')
+    expect(store.getState().biometric.enabled).toBe(false)
+    expect(store.getState().error).toContain('retry Biometrics in Settings')
+  })
+
+  it('does not accept a structurally enabled partial commit after an unverified throw', async () => {
+    environment.biometricEnableError = true
+    environment.biometricCommitBeforeError = true
+    const store = await loadStore()
+    await store.getState().initialize()
+    await expect(store.getState().importWallet(mnemonic, password, true)).rejects.toThrow('could not be enabled or verified')
+    expect(store.getState().status).toBe('locked')
+    expect(store.getState().biometric.enabled).toBe(false)
+  })
+
+  it('allows a clear password fallback and a later enrollment retry after onboarding failure', async () => {
+    environment.biometricEnableResult = false
+    const store = await loadStore()
+    await store.getState().initialize()
+    await expect(store.getState().importWallet(mnemonic, password, true)).rejects.toThrow()
+    const restored = await store.getState().checkPassword(password)
+    expect(restored).toBe(mnemonic)
+    await store.getState().unlockWallet(restored as string)
+    environment.biometricEnableResult = true
+    await store.getState().toggleBiometric(true, password)
+    expect(store.getState().biometric.enabled).toBe(true)
+  })
+
+  it('does not let a stale enrollment completion overwrite a newer cross-tab wallet state', async () => {
+    const previousWindow = window
+    const tokens = new Map<string, string>()
+    vi.stubGlobal('window', { ...previousWindow, localStorage: {
+      getItem: (key: string) => tokens.get(key) ?? null,
+      setItem: (key: string, value: string) => { tokens.set(key, value) },
+    } })
+    let release!: () => void
+    environment.biometricEnableGate = new Promise<void>(resolve => { release = resolve })
+    try {
+      const store = await loadStore()
+      await store.getState().initialize()
+      const pending = store.getState().importWallet(mnemonic, password, true)
+      await vi.waitFor(() => expect(environment.biometricEnableStarted).toHaveBeenCalledTimes(1))
+      tokens.set('ge_wallet_session_event', JSON.stringify({ sourceId: 'other-tab', nonce: 'newer-wallet' }))
+      store.setState({ status: 'locked', vaultId: 'newer-vault', vaultRevision: 9, error: 'Authoritative newer state' })
+      release()
+      await expect(pending).rejects.toThrow('session changed')
+      expect(store.getState().vaultId).toBe('newer-vault')
+      expect(store.getState().vaultRevision).toBe(9)
+      expect(store.getState().error).toBe('Authoritative newer state')
+    } finally {
+      vi.stubGlobal('window', previousWindow)
+    }
   })
 
   it('rejects an incorrect password without exposing keys', async () => {
@@ -259,9 +367,86 @@ describe('atomic wallet identity, migration and session policy', () => {
     const replacement = 'PUBLIC-New-Password-456!'
     await store.getState().completeLegacyRecovery(recovery, replacement)
     expect(environment.legacy).toBe(false)
+    expect(environment.biometricEnable).toHaveBeenCalledTimes(1)
+    expect(store.getState().biometric.enabled).toBe(true)
     expect(store.getState().address).toBe(golden.seeds[0].address)
     expect(await store.getState().checkPassword(replacement)).toBe(mnemonic)
     expect(await store.getState().checkPassword(password)).toBe(false)
+  })
+
+  it('reports migration enrollment failure, retires stale legacy access, and preserves the new password', async () => {
+    environment.secure.set('ge_secure:mnemonic', golden.vaults[0].encrypted)
+    environment.basic.set('ge_basic:backedup', 'true')
+    environment.legacy = true
+    environment.biometricEnableResult = false
+    const store = await loadStore()
+    await store.getState().initialize()
+    const recovery = await store.getState().recoverLegacyAccess()
+    const replacement = 'PUBLIC-New-Password-456!'
+    await expect(store.getState().completeLegacyRecovery(recovery, replacement)).rejects.toThrow('password was upgraded')
+    expect(environment.legacy).toBe(false)
+    expect(store.getState().status).toBe('locked')
+    expect(store.getState().biometric.enabled).toBe(false)
+    expect(await store.getState().checkPassword(replacement)).toBe(mnemonic)
+  })
+
+  it('upgrades legacy biometric intent during an ordinary password unlock', async () => {
+    environment.secure.set('ge_secure:mnemonic', golden.vaults[0].encrypted)
+    environment.basic.set('ge_basic:backedup', 'true')
+    environment.legacy = true
+    const store = await loadStore()
+    await store.getState().initialize()
+    const restored = await store.getState().checkPassword(password)
+    await store.getState().retireLegacyWithPassword(password)
+    await store.getState().unlockWallet(restored as string)
+    expect(environment.legacy).toBe(false)
+    expect(store.getState().biometric.enabled).toBe(true)
+  })
+
+  it.each(['unsupported', 'cancelled'] as const)('continues ordinary password unlock after legacy retirement when PRF is %s', async outcome => {
+    environment.secure.set('ge_secure:mnemonic', golden.vaults[0].encrypted)
+    environment.basic.set('ge_basic:backedup', 'true')
+    environment.legacy = true
+    if (outcome === 'unsupported') environment.biometricEnableResult = false
+    else environment.biometricEnableError = true
+    const store = await loadStore()
+    await store.getState().initialize()
+    const restored = await store.getState().checkPassword(password)
+    const warning = await store.getState().retireLegacyWithPassword(password)
+    expect(warning).toContain('secure biometric enrollment did not finish')
+    expect(environment.legacy).toBe(false)
+    expect(store.getState().biometric.enabled).toBe(false)
+    expect(await store.getState().unlockWallet(restored as string)).toBe(true)
+    expect(store.getState().status).toBe('unlocked')
+  })
+
+  it('accepts an ordinary legacy upgrade when a final verified cleanup retry succeeds', async () => {
+    environment.secure.set('ge_secure:mnemonic', golden.vaults[0].encrypted)
+    environment.basic.set('ge_basic:backedup', 'true')
+    environment.legacy = true
+    environment.credentialCleanupFailures = 2
+    const store = await loadStore()
+    await store.getState().initialize()
+    expect(await store.getState().retireLegacyWithPassword(password)).toBeNull()
+    expect(environment.credentialCleanupFailures).toBe(0)
+    expect(environment.legacy).toBe(false)
+    expect(store.getState().biometric.enabled).toBe(true)
+    expect(store.getState().error).toBeNull()
+  })
+
+  it('opens recovery normally when a final verified cleanup retry succeeds', async () => {
+    environment.secure.set('ge_secure:mnemonic', golden.vaults[0].encrypted)
+    environment.basic.set('ge_basic:backedup', 'true')
+    environment.legacy = true
+    environment.credentialCleanupFailures = 2
+    const store = await loadStore()
+    await store.getState().initialize()
+    const recovery = await store.getState().recoverLegacyAccess()
+    await store.getState().completeLegacyRecovery(recovery, 'PUBLIC-New-Password-456!')
+    expect(environment.credentialCleanupFailures).toBe(0)
+    expect(environment.legacy).toBe(false)
+    expect(store.getState().status).toBe('unlocked')
+    expect(store.getState().biometric.enabled).toBe(true)
   })
 
   it('S1: a failed legacy password replacement preserves the old vault and recovery path', async () => {
@@ -310,9 +495,10 @@ describe('migration fault boundaries independently requested by final QA', () =>
     const recovery = await store.getState().recoverLegacyAccess()
     environment.failCredentialCleanup = true
     const replacement = 'PUBLIC-Recovery-Cleanup-456!'
-    await expect(store.getState().completeLegacyRecovery(recovery, replacement)).rejects.toThrow('cleanup')
+    await expect(store.getState().completeLegacyRecovery(recovery, replacement)).rejects.toThrow('password was upgraded')
     expect(environment.legacy).toBe(true)
-    expect(store.getState().status).toBe('error')
+    expect(store.getState().status).toBe('locked')
+    expect(store.getState().biometric.enabled).toBe(true)
     environment.failCredentialCleanup = false
     await store.getState().initialize()
     expect(await store.getState().checkPassword(replacement)).toBe(mnemonic)

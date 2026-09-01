@@ -7,12 +7,18 @@ import { WalletVaultService, withWalletMutation } from './WalletVaultService'
 const KEYS = { ENABLED: 'biometric_enabled', CREDENTIAL_ID: 'biometric_credential_id', ENCRYPTED_PASSWORD: 'biometric_encrypted_password', PRF: 'biometric_prf_v2' }
 const SERVER_ID = 'wallet.goldenera.global'
 const SCHEME = 'webauthn-prf-hkdf-sha256-aes256gcm'
+const WEBAUTHN_USER_NAME = 'GoldenEra Wallet'
+const WEBAUTHN_USER_DISPLAY_NAME = 'GoldenEra Wallet'
 
 export interface BiometricContext {
   vaultId: string
   vaultRevision: number
   signal?: AbortSignal
   isCurrent?: () => boolean
+}
+export interface BiometricEnrollmentResult {
+  verified: boolean
+  legacyCleanupComplete: boolean
 }
 interface PrfEnvelope {
   version: 2
@@ -25,11 +31,24 @@ interface PrfEnvelope {
   salt: string
   iv: string
   data: string
+  /** Base64url-encoded opaque WebAuthn user handle, available for new enrollments. */
+  userId?: string
 }
 type PrfOutputs = AuthenticationExtensionsClientOutputs & { prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } } }
+type CredentialSignalApi = typeof PublicKeyCredential & {
+  signalCurrentUserDetails?: (options: { rpId: string; userId: string; name: string; displayName: string }) => Promise<void>
+}
 
 const random = (length: number) => window.crypto.getRandomValues(new Uint8Array(length))
 const hex = (value: unknown, bytes?: number): value is string => typeof value === 'string' && /^[0-9a-f]+$/i.test(value) && value.length % 2 === 0 && (bytes === undefined || value.length === bytes * 2)
+const base64url = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+const isBase64url = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && /^[A-Za-z0-9_-]+$/.test(value)
+const webauthnUserId = async (vaultId: string) => new Uint8Array(await window.crypto.subtle.digest(
+  'SHA-256',
+  new TextEncoder().encode(`goldenera-wallet/webauthn-user/v1:${vaultId}`),
+))
+// userId is intentionally excluded: existing PRF envelopes must keep the exact
+// authenticated-data contract used before credential-label metadata existed.
 const aad = (value: PrfEnvelope) => new TextEncoder().encode(JSON.stringify([value.version, value.scheme, value.walletId, value.vaultRevision, value.rpId, value.credentialId, value.prfInput, value.salt]))
 const assertCurrent = (context: BiometricContext) => {
   if (context.signal?.aborted || context.isCurrent?.() === false) throw new Error('Wallet session changed. Retry authentication.')
@@ -41,7 +60,27 @@ function parseEnvelope(value: unknown): PrfEnvelope | null {
   const record = value as Partial<PrfEnvelope>
   if (record.version !== 2 || record.scheme !== SCHEME || typeof record.walletId !== 'string' || typeof record.rpId !== 'string' ||
     !Number.isSafeInteger(record.vaultRevision) || !hex(record.credentialId) || !hex(record.prfInput, 32) || !hex(record.salt, 32) || !hex(record.iv, 12) || !hex(record.data)) return null
+  if (record.userId !== undefined && !isBase64url(record.userId)) return null
   return record as PrfEnvelope
+}
+
+async function signalCredentialLabels(envelope: PrfEnvelope, assertedUserId?: string): Promise<void> {
+  if (envelope.userId && assertedUserId && envelope.userId !== assertedUserId) return
+  const userId = envelope.userId ?? assertedUserId
+  if (!userId) return
+  const api = globalThis.PublicKeyCredential as CredentialSignalApi | undefined
+  if (typeof api?.signalCurrentUserDetails !== 'function') return
+  try {
+    await api.signalCurrentUserDetails({
+      rpId: envelope.rpId,
+      userId,
+      name: WEBAUTHN_USER_NAME,
+      displayName: WEBAUTHN_USER_DISPLAY_NAME,
+    })
+  } catch {
+    // WebAuthn signals are opportunistic metadata updates. Authentication must
+    // remain available when a browser or authenticator cannot apply the label.
+  }
 }
 
 function prfOutput(credential: PublicKeyCredential): Uint8Array | null {
@@ -141,17 +180,24 @@ export const BiometricService = {
     const key = await wrappingKey(secret, envelope.salt)
     const password = await decryptEnvelope(envelope, key)
     assertCurrent(context)
+    const returnedUserHandle = (credential.response as AuthenticatorAssertionResponse).userHandle
+    const assertedUserId = returnedUserHandle instanceof ArrayBuffer && returnedUserHandle.byteLength > 0 && returnedUserHandle.byteLength <= 64
+      ? base64url(new Uint8Array(returnedUserHandle))
+      : undefined
+    void signalCredentialLabels(envelope, assertedUserId)
     return { success: true, password }
   },
 
-  async enable(password: string, context: BiometricContext): Promise<boolean> {
+  async enable(password: string, context: BiometricContext): Promise<BiometricEnrollmentResult> {
     assertCurrent(context)
     if (BiometricUtil.getPlatform() !== 'web') {
       await NativeBiometric.setCredentials({ username: 'goldenera-wallet', password, server: SERVER_ID })
       await StorageService.basic.setItem(KEYS.ENABLED, true)
-      return true
+      return { verified: true, legacyCleanupComplete: true }
     }
-    if (!BiometricUtil.isWebAuthnAvailable()) return false
+    if (!BiometricUtil.isWebAuthnAvailable()) return { verified: false, legacyCleanupComplete: false }
+    const userId = await webauthnUserId(context.vaultId)
+    assertCurrent(context)
     const challenge = random(32)
     const prfInput = random(32)
     const credential = await navigator.credentials.create({
@@ -159,7 +205,7 @@ export const BiometricService = {
       publicKey: {
         challenge,
         rp: { name: 'GoldenEra Wallet', id: window.location.hostname },
-        user: { id: random(32), name: `wallet-${context.vaultId}`, displayName: 'GoldenEra Wallet' },
+        user: { id: userId, name: WEBAUTHN_USER_NAME, displayName: WEBAUTHN_USER_DISPLAY_NAME },
         pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
         timeout: 60000,
@@ -167,30 +213,48 @@ export const BiometricService = {
       },
     }) as PublicKeyCredential | null
     assertCurrent(context)
-    if (!credential) return false
+    if (!credential) return { verified: false, legacyCleanupComplete: false }
     validateClientData(credential, challenge, 'webauthn.create')
-    if ((credential.getClientExtensionResults() as PrfOutputs).prf?.enabled !== true) return false
+    if ((credential.getClientExtensionResults() as PrfOutputs).prf?.enabled !== true) return { verified: false, legacyCleanupComplete: false }
     const credentialId = bufferToHex(credential.rawId)
     const secret = prfOutput(credential) ?? prfOutput(await assertion(credentialId, context, bufferToHex(prfInput)))
-    if (!secret) return false
+    if (!secret) return { verified: false, legacyCleanupComplete: false }
     const envelope: PrfEnvelope = {
       version: 2, scheme: SCHEME, walletId: context.vaultId, vaultRevision: context.vaultRevision,
       rpId: window.location.hostname, credentialId, prfInput: bufferToHex(prfInput), salt: bufferToHex(random(32)), iv: bufferToHex(random(12)), data: '',
+      userId: base64url(userId),
     }
     const key = await wrappingKey(secret, envelope.salt)
     envelope.data = bufferToHex(await window.crypto.subtle.encrypt({ name: 'AES-GCM', iv: hexToBuffer(envelope.iv) as BufferSource, additionalData: aad(envelope) }, key, new TextEncoder().encode(password)))
+    let legacyCleanupComplete = false
     await withWalletMutation(async () => {
       assertCurrent(context)
       const vault = await WalletVaultService.read()
       if (!vault || vault.id !== context.vaultId || vault.revision !== context.vaultRevision || !await WalletVaultService.decrypt(vault, password)) throw new Error('Wallet changed during biometric enrollment')
       assertCurrent(context)
-      await StorageService.basic.setItem(KEYS.PRF, envelope)
-      const persisted = parseEnvelope(await StorageService.basic.getItem(KEYS.PRF))
-      if (!persisted || !matches(persisted, context) || await decryptEnvelope(persisted, key) !== password) throw new Error('Biometric persistence verification failed')
+      const previous = await StorageService.basic.getItem(KEYS.PRF)
+      try {
+        await StorageService.basic.setItem(KEYS.PRF, envelope)
+        const persisted = parseEnvelope(await StorageService.basic.getItem(KEYS.PRF))
+        if (!persisted || !matches(persisted, context) || await decryptEnvelope(persisted, key) !== password) throw new Error('Biometric persistence verification failed')
+      } catch (error) {
+        try {
+          if (previous === null) await StorageService.basic.removeItem(KEYS.PRF)
+          else await StorageService.basic.setItem(KEYS.PRF, previous)
+        } catch { /* The caller still treats this enrollment as unverified. */ }
+        throw error
+      }
       assertCurrent(context)
-      await this.removeLegacy()
+      try {
+        await this.removeLegacy()
+        assertCurrent(context)
+        legacyCleanupComplete = true
+      } catch {
+        // The PRF wrapper already passed a real decrypt readback. Its caller can
+        // retry legacy cleanup without confusing this with an unverified write.
+      }
     })
-    return true
+    return { verified: true, legacyCleanupComplete }
   },
 
   /** The only credential-ID decryption path: explicit one-time legacy recovery. */

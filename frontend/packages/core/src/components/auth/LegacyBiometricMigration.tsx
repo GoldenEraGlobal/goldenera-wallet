@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, PasswordInput } from '@project/ui'
 import { useEffect, useRef, useState } from 'react'
-import { useWalletStore, type LegacyRecovery } from '../../store/WalletStore'
+import { LegacyRecoveryEnrollmentError, useWalletStore, type LegacyRecovery } from '../../store/WalletStore'
 
 /** One-time recovery only; legacy credentials are never a normal unlock option. */
 export const LegacyBiometricMigration = () => {
@@ -14,6 +14,7 @@ export const LegacyBiometricMigration = () => {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [postCommitFailure, setPostCommitFailure] = useState(false)
   const busy = useRef(false)
   const ownsRecovery = useRef(false)
 
@@ -76,6 +77,14 @@ export const LegacyBiometricMigration = () => {
       setPassword('')
       setConfirm('')
     } catch (failure) {
+      if (failure instanceof LegacyRecoveryEnrollmentError) {
+        cancel()
+        ownsRecovery.current = false
+        setRecovery(null)
+        setPassword('')
+        setConfirm('')
+        setPostCommitFailure(true)
+      }
       setError(failure instanceof Error ? failure.message : 'Recovery upgrade could not finish. Keep the new password and retry.')
     } finally { busy.current = false; setPending(false) }
   }
@@ -92,12 +101,14 @@ export const LegacyBiometricMigration = () => {
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">This does not protect copies of older wallet data that somebody may already have obtained.</p>
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-        {recovery ? (
+        {postCommitFailure ? (
+          <p className="text-sm">The new password is saved. Unlock the wallet with that password, then retry Biometrics in Settings.</p>
+        ) : recovery ? (
           <form onSubmit={finish} className="space-y-3">
-            <p className="text-sm">Your recovery phrase and address stay unchanged. Store the new password safely; secure biometrics can be enabled in Settings afterward.</p>
+            <p className="text-sm">Your recovery phrase and address stay unchanged. Store the new password safely; the wallet will then ask your authenticator to upgrade biometric access.</p>
             <PasswordInput aria-label="New wallet password" placeholder="New wallet password" value={password} onChange={event => setPassword(event.target.value)} disabled={pending} />
             <PasswordInput aria-label="Confirm new wallet password" placeholder="Confirm new wallet password" value={confirm} onChange={event => setConfirm(event.target.value)} disabled={pending} />
-            <Button type="submit" className="w-full" disabled={pending || !password || !confirm}>{pending ? 'Upgrading...' : 'Save new password and remove old biometrics'}</Button>
+            <Button type="submit" className="w-full" disabled={pending || !password || !confirm}>{pending ? 'Upgrading...' : 'Save new password and upgrade biometrics'}</Button>
             <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={() => { cancel(); ownsRecovery.current = false; setRecovery(null); setPassword(''); setConfirm('') }}>Cancel recovery</Button>
           </form>
         ) : (

@@ -1,7 +1,6 @@
 package global.goldenera.wallet;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,7 +13,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import javax.sql.DataSource;
 
@@ -182,7 +180,7 @@ class DeviceCleanupPostgresTest {
     }
 
     @Test
-    void concurrentlyRefreshedDeviceIsSkippedAndSurvives() throws Exception {
+    void concurrentlyRefreshedDeviceIsSkippedWithoutWaitingAndSurvives() throws Exception {
         UUID deviceId = insertDevice(STALE);
         insertAddress(40L);
         insertAccount(40L, deviceId, 40L);
@@ -203,14 +201,13 @@ class DeviceCleanupPostgresTest {
                 return cleanup.cleanupBatch(THRESHOLD, 10);
             });
             assertThat(cleanupStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            assertCleanupIsWaiting(cleanupRun);
-            connection.commit();
+            // The uncommitted refresh owns the device row lock. SKIP LOCKED must
+            // return without waiting or deleting the still-visible stale account.
             result = cleanupRun.get(10, TimeUnit.SECONDS);
+            connection.commit();
         }
 
-        assertThat(result.didWork()).isFalse();
-        assertThat(result.deletedAccounts()).isZero();
-        assertThat(result.deletedDevices()).isZero();
+        assertThat(result).isEqualTo(new DeviceCleanupBatchResult(1, 0, 0, 0, 0, 0));
         assertThat(cleanup.cleanupBatch(THRESHOLD, 10).didWork()).isFalse();
         assertThat(deviceExists(deviceId)).isTrue();
         assertThat(accountExists(40L)).isTrue();
@@ -218,7 +215,7 @@ class DeviceCleanupPostgresTest {
     }
 
     @Test
-    void uncommittedLateForeignKeyInsertPreventsDeviceDeletion() throws Exception {
+    void uncommittedLateForeignKeyInsertIsSkippedWithoutWaitingAndPreventsDeviceDeletion() throws Exception {
         UUID deviceId = insertDevice(STALE);
         insertAddress(50L);
         DeviceCleanupBatchResult result;
@@ -241,14 +238,13 @@ class DeviceCleanupPostgresTest {
                 return cleanup.cleanupBatch(THRESHOLD, 10);
             });
             assertThat(cleanupStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            assertCleanupIsWaiting(cleanupRun);
-            connection.commit();
+            // PostgreSQL's FK check holds a conflicting device key-share lock.
+            // The zero-account path must skip it immediately and fail closed.
             result = cleanupRun.get(10, TimeUnit.SECONDS);
+            connection.commit();
         }
 
-        assertThat(result.selectedZeroAccountDevices()).isEqualTo(1);
-        assertThat(result.deletedZeroAccountDevices()).isZero();
-        assertThat(result.didWork()).isFalse();
+        assertThat(result).isEqualTo(new DeviceCleanupBatchResult(0, 0, 0, 0, 0, 0));
         assertThat(deviceExists(deviceId)).isTrue();
         assertThat(accountExists(50L)).isTrue();
         assertThat(addressExists(50L)).isTrue();
@@ -281,11 +277,6 @@ class DeviceCleanupPostgresTest {
 
         assertThat(addressExists(60L)).isFalse();
         assertThat(addressExists(61L)).isTrue();
-    }
-
-    private void assertCleanupIsWaiting(Future<DeviceCleanupBatchResult> cleanupRun) {
-        assertThatThrownBy(() -> cleanupRun.get(250, TimeUnit.MILLISECONDS))
-                .isInstanceOf(TimeoutException.class);
     }
 
     private UUID insertDevice(Instant lastSeenAt) {

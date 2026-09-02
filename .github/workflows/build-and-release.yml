@@ -129,9 +129,21 @@ jobs:
         run: pnpm --dir frontend exec playwright install --with-deps chromium firefox
 
       - name: Exercise the built PWA in Chromium
+        id: chromium
         env:
           WALLET_E2E_PRODUCTION: '1'
         run: pnpm --dir frontend test:e2e
+
+      - name: Upload Chromium failure diagnostics
+        if: failure() && steps.chromium.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wallet-e2e-failure-${{ github.sha }}
+          path: |
+            /tmp/goldenera-wallet-e2e-results.json
+            /tmp/goldenera-wallet-e2e-artifacts
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Smoke the built PWA in Firefox
         env:

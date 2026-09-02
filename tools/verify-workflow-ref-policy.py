@@ -193,7 +193,7 @@ def verify_actions_and_interpolation(jobs: dict[str, dict[str, Any]]) -> None:
         f"actions/checkout@{ACTION_PINS['actions/checkout']}": 4,
         f"actions/setup-java@{ACTION_PINS['actions/setup-java']}": 1,
         f"actions/setup-node@{ACTION_PINS['actions/setup-node']}": 1,
-        f"actions/upload-artifact@{ACTION_PINS['actions/upload-artifact']}": 2,
+        f"actions/upload-artifact@{ACTION_PINS['actions/upload-artifact']}": 3,
         f"actions/download-artifact@{ACTION_PINS['actions/download-artifact']}": 3,
         f"pnpm/setup@{ACTION_PINS['pnpm/setup']}": 1,
         f"docker/setup-buildx-action@{ACTION_PINS['docker/setup-buildx-action']}": 1,
@@ -317,6 +317,18 @@ tar -xf "$archive" -C "$HOME/.m2/repository"
     firefox = step_named(build, "build", "Smoke the built PWA in Firefox")
     require(firefox.get("env") == {"WALLET_E2E_CROSS_BROWSER": "1", "WALLET_E2E_PRODUCTION": "1"}, "Firefox smoke must target the built cross-browser PWA suite")
     require(run_text(firefox, "Firefox smoke") == "timeout --signal=TERM 5m pnpm --dir frontend test:e2e", "Firefox smoke must remain bounded")
+
+    chromium = step_with_id(build, "build", "chromium")
+    require(run_text(chromium, "Chromium production suite") == "pnpm --dir frontend test:e2e", "Chromium must exercise the complete production PWA suite")
+    diagnostics = step_named(build, "build", "Upload Chromium failure diagnostics")
+    require(diagnostics.get("if") == "failure() && steps.chromium.outcome == 'failure'", "Playwright diagnostics must upload only after a definitive Chromium failure")
+    require(diagnostics.get("uses") == f"actions/upload-artifact@{ACTION_PINS['actions/upload-artifact']}", "Playwright diagnostics must use the reviewed artifact action")
+    require(mapping(diagnostics.get("with"), "Playwright diagnostic upload inputs must be explicit") == {
+        "name": "wallet-e2e-failure-${{ github.sha }}",
+        "path": "/tmp/goldenera-wallet-e2e-results.json\n/tmp/goldenera-wallet-e2e-artifacts\n",
+        "if-no-files-found": "error",
+        "retention-days": 7,
+    }, "Playwright diagnostics must retain the JSON report, screenshots, and traces")
 
     reproducible = step_named(build, "build", "Build, test, and reproduce the backend JAR")
     require(reproducible.get("env") == {"GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}", "SOURCE_DATE_EPOCH": "${{ steps.identity.outputs.source_epoch }}"}, "Maven must receive the commit-derived timestamp through env")

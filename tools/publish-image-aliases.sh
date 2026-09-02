@@ -27,6 +27,9 @@ assert_package_write_identity() {
     default)
       assert_current_default_head
       ;;
+    dev)
+      assert_current_source_branch_head
+      ;;
     version)
       assert_version_publication_ready
       ;;
@@ -246,6 +249,19 @@ publish_immutable_alias() {
   verify_manifest_reference "$alias" "$prefix-replay-verify"
 }
 
+publish_mutable_alias() {
+  local alias="$1" prefix status
+  [[ "$alias" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] || exit 1
+  prefix="$RUNNER_TEMP/mutable-${alias//[^A-Za-z0-9_.-]/_}"
+  status="$(put_manifest "$alias" "$final_manifest" false "$prefix")"
+  [[ "$status" == '201' ]] || {
+    echo "Publishing mutable image alias $IMAGE:$alias failed (HTTP $status)." >&2
+    exit 1
+  }
+  verify_manifest_reference "$alias" "$prefix-verify"
+  echo "Published mutable image alias: $IMAGE:$alias"
+}
+
 metadata_dir="$RUNNER_TEMP/image-metadata"
 mapfile -t metadata_files < <(find "$metadata_dir" -maxdepth 1 -type f -name '*.json' -printf '%f\n' | sort)
 [[ "${metadata_files[*]}" == 'amd64.json arm64.json' ]] || {
@@ -326,6 +342,13 @@ case "$MODE" in
       adopt_existing_manifest "sha-$COMMIT_SHA"
     fi
     ;;
+  dev)
+    require_release_env GRAPHQL_URL SOURCE_BRANCH
+    assert_current_source_branch_head
+    if inspect_existing_immutable_alias "sha-$COMMIT_SHA"; then
+      adopt_existing_manifest "sha-$COMMIT_SHA"
+    fi
+    ;;
   version)
     require_release_env API_URL GRAPHQL_URL RELEASE_TAG VERSION
     assert_version_publication_ready
@@ -337,7 +360,7 @@ case "$MODE" in
     fi
     ;;
   *)
-    echo 'Feature branches, pull requests, and manual runs must never publish.' >&2
+    echo 'Pull requests, manual runs, and stale branch runs must never publish.' >&2
     exit 1
     ;;
 esac
@@ -388,19 +411,29 @@ probe_status="$(put_manifest "$manifest_digest" "$final_manifest" true "$probe_p
 }
 verify_manifest_reference "$manifest_digest" "$RUNNER_TEMP/conditional-capability-verify"
 
-if [[ "$MODE" == 'default' ]]; then
-  assert_current_default_head
-  publish_immutable_alias "sha-$COMMIT_SHA"
-  assert_current_default_head
-else
-  assert_release_version_identity
-  publish_immutable_alias "sha-$COMMIT_SHA"
-  assert_release_version_identity
-  # The put_manifest boundary guard repeats ruleset and identity verification
-  # before both the create-only semantic PUT and its conditional replay.
-  publish_immutable_alias "$VERSION"
-  assert_release_version_identity
-fi
+case "$MODE" in
+  default)
+    assert_current_default_head
+    publish_immutable_alias "sha-$COMMIT_SHA"
+    assert_current_default_head
+    ;;
+  dev)
+    assert_current_source_branch_head
+    publish_immutable_alias "sha-$COMMIT_SHA"
+    assert_current_source_branch_head
+    publish_mutable_alias "dev"
+    assert_current_source_branch_head
+    ;;
+  version)
+    assert_release_version_identity
+    publish_immutable_alias "sha-$COMMIT_SHA"
+    assert_release_version_identity
+    # The put_manifest boundary guard repeats ruleset and identity verification
+    # before both the create-only semantic PUT and its conditional replay.
+    publish_immutable_alias "$VERSION"
+    assert_release_version_identity
+    ;;
+esac
 
 {
   echo "amd64_image_digest=$amd64_image_digest"

@@ -63,6 +63,7 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     release = scripts["release"]
 
     require("defaultBranchRef{name target{oid}}" in common, "Default branch and head must come from one current GraphQL response")
+    require("ref(qualifiedName:$qualified){target{oid}}" in common and ".data.repository.ref.target.oid" in common, "Development branch head must come from the current qualified GitHub ref")
     require("github.event.repository.default_branch" not in common, "Stale event default-branch metadata is forbidden")
     require('git check-ref-format "refs/heads/$CURRENT_DEFAULT_BRANCH"' in common, "All valid Git default branch names must be accepted")
     require("for depth in 1 2 3 4" in common, "Annotated release tags must resolve with a fail-closed depth bound")
@@ -74,13 +75,18 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     ready = common.split("assert_version_publication_ready()", 1)[1]
     require(ready.count("assert_release_version_identity") == 2 and "assert_release_tag_immutable" in ready, "Write readiness must bound ruleset proof with exact identity/ancestry checks")
 
-    require(assignment_values(identity, "publish_mode") == ["none", "default", "version"], "Publication modes must be active assignments none/default/version")
+    require(assignment_values(identity, "publish_mode") == ["none", "default", "dev", "version"], "Publication modes must be active assignments none/default/dev/version")
     require("EVENT_NAME" in identity and "EVENT_REF" in identity and "git rev-parse HEAD" in identity, "Identity must bind publication to push event and full checked-out commit")
+    identity_active = active_lines(identity)
+    dev_assignment = ["publish_mode=dev"]
+    dev_gate_index = next((index for index, tokens in enumerate(identity_active) if any(token.rstrip(";") == "assert_current_source_branch_head" for token in tokens)), None)
+    require(dev_gate_index is not None and dev_assignment in identity_active and dev_gate_index < identity_active.index(dev_assignment), "Development mode must verify the current source-branch head before enabling publication")
+    require('"$source_branch" != "$default_branch"' in identity, "A stale default-branch run must never fall through to development publication")
     require("assert_version_publication_ready" in identity and identity.index("assert_version_publication_ready") < identity.index("publish_mode=version"), "Version mode must be rejected before it can enable publication")
     require('echo "default_branch=' not in identity, "Unused default-branch workflow output must not be emitted")
     require("SOURCE_DATE_EPOCH" in identity and "git show --no-patch --format=%ct" in identity, "Commit timestamp must define reproducible build time")
 
-    require("assert_current_default_head" in recheck and "assert_version_publication_ready" in recheck, "Native builders must recheck either publication identity")
+    require("assert_current_default_head" in recheck and "assert_current_source_branch_head" in recheck and "assert_version_publication_ready" in recheck, "Native builders must recheck every publication identity")
     require("A non-publishing run reached an image builder" in recheck, "Non-publish modes must fail closed in image builders")
 
     require(has_active(images, ["arguments+=(--header", "If-None-Match: *)"]), "Immutable aliases require an active If-None-Match create-only header")
@@ -96,12 +102,14 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     require("no aliases were published" in images and "unconditional digest replay" in images, "Registry capability proof must fail before aliases and distinguish duplicate rejection")
     require("(.manifests | length) == 4" in images, "Final aliases must contain two runnable and two attestation descriptors")
     require("runnable_descriptor" in images and "attestation_descriptor" in images, "Final index must preserve verified platform descriptors")
-    require(images.count('inspect_existing_immutable_alias "sha-$COMMIT_SHA"') == 2, "Both modes must inspect the immutable SHA alias for exact recovery")
+    require(images.count('inspect_existing_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must inspect the immutable SHA alias for exact recovery")
     require(images.count('inspect_existing_immutable_alias "$VERSION"') == 1, "Version recovery must inspect the semantic alias")
     require("adopt_existing_manifest" in images and "cmp -s" in images, "Existing immutable aliases must be adopted only when their exact bytes agree")
     require("verify_attested_index" in images and "https://slsa.dev/provenance/v0.2" in images and "https://spdx.dev/Document" in images, "Adopted and new indexes must verify linked provenance and SBOM")
-    require(images.count('publish_immutable_alias "sha-$COMMIT_SHA"') == 2, "Default and version modes must both ensure full-SHA alias")
+    require(images.count('publish_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must ensure a full-SHA alias")
     require(images.count('publish_immutable_alias "$VERSION"') == 1, "Version mode must ensure exactly one semantic alias")
+    require(images.count('publish_mutable_alias "dev"') == 1, "Development mode must publish exactly one mutable dev alias")
+    require("assert_current_source_branch_head" in images.split("assert_package_write_identity()", 1)[1].split("\n}", 1)[0], "Every development registry PUT must recheck the source-branch head")
     require("publish_latest" not in images and "manifests/latest" not in images, "Immutable publication must never read or move latest")
 
     forbidden_release = ("gh release delete", "--request DELETE", "--clobber", "git push --delete", "git tag -d")
@@ -272,6 +280,34 @@ assert_version_publication_ready
         check=False,
     )
     require(result.returncode == 0, f"Write-readiness ordering fixture failed: {result.stderr}")
+
+
+def run_source_branch_head_fixture(*, commit: str, branch_head: str, expected: bool) -> None:
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            r'''set -euo pipefail
+source "$1"
+COMMIT_SHA="$2"
+SOURCE_BRANCH=feature/test
+MOCK_BRANCH_HEAD="$3"
+read_current_source_branch_identity() { CURRENT_SOURCE_BRANCH_HEAD="$MOCK_BRANCH_HEAD"; }
+assert_current_source_branch_head
+''',
+            "fixture",
+            str(SCRIPTS["common"]),
+            commit,
+            branch_head,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    require(
+        (result.returncode == 0) == expected,
+        f"Source-branch identity fixture returned {result.returncode}, expected success={expected}: {result.stderr}",
+    )
 
 
 def run_release_fixture(source: str, release: dict, expected: bool, expected_kind: str | None = None) -> None:
@@ -472,6 +508,8 @@ def run_fixtures(scripts: dict[str, str]) -> None:
     )
     run_version_identity_fixture(commit=commit, default_head=head, second_head="d" * 40, tag_commit=commit, expected=False)
     run_ready_order_fixture()
+    run_source_branch_head_fixture(commit=commit, branch_head=commit, expected=True)
+    run_source_branch_head_fixture(commit=commit, branch_head=head, expected=False)
 
     source = extract_release_policy_python(scripts["release"])
     base = {"tag_name": "v1.2.3", "name": "v1.2.3", "body": "exact notes\n", "draft": True, "prerelease": False}
@@ -512,9 +550,11 @@ def negative_mutations(scripts: dict[str, str]) -> list[tuple[str, dict[str, str
 
     return [
         ("comment-hidden publish mode", changed("identity", "publish_mode=none", "publish_mode=default # publish_mode=none")),
+        ("development mode loses branch-head gate", changed("identity", "  if assert_current_source_branch_head; then\n    publish_mode=dev", "  if true; then # assert_current_source_branch_head\n    publish_mode=dev")),
         ("commented create-only header", changed("images", "arguments+=(--header 'If-None-Match: *')", ": # If-None-Match: *")),
         ("two-descriptor alias", changed("images", "(.manifests | length) == 4", "(.manifests | length) == 2")),
         ("version moves latest", changed("images", 'publish_immutable_alias "$VERSION"', "publish_latest # publish_immutable_alias \"$VERSION\"")),
+        ("development alias becomes latest", changed("images", 'publish_mutable_alias "dev"', 'publish_mutable_alias "latest"')),
         ("registry write loses identity guard", changed("images", "  assert_package_write_identity || return 1\n  arguments=(", "  : # assert_package_write_identity || return 1\n  arguments=(")),
         ("version write loses ruleset proof", changed("images", "      assert_version_publication_ready", "      assert_release_tag_commit")),
         ("release accepts extra assets", changed("release", "len(assets) in (0, 1)", "len(assets) >= 0")),

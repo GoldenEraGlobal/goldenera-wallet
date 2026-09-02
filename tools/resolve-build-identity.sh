@@ -34,6 +34,12 @@ fi
 
 if [[ "$EVENT_NAME" == 'push' && -n "$source_branch" && "$source_branch" == "$default_branch" && "$commit_sha" == "$default_head" ]]; then
   publish_mode=default
+elif [[ "$EVENT_NAME" == 'push' && -n "$source_branch" && "$source_branch" != "$default_branch" ]]; then
+  COMMIT_SHA="$commit_sha"
+  SOURCE_BRANCH="$source_branch"
+  if assert_current_source_branch_head; then
+    publish_mode=dev
+  fi
 elif [[ "$EVENT_NAME" == 'push' && "$EVENT_REF" == refs/tags/* ]]; then
   release_tag="${EVENT_REF#refs/tags/}"
   COMMIT_SHA="$commit_sha"

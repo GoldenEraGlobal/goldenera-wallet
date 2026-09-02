@@ -475,15 +475,16 @@ jobs:
           retention-days: 1
 
   publish-images:
-    name: Publish immutable policy-compliant image aliases
+    name: Publish policy-compliant image aliases
     if: needs.build.outputs.publish_mode != 'none'
     needs:
       - build
       - build-images
     runs-on: ubuntu-24.04
-    # Different commits cannot evict one another while immutable aliases publish.
+    # Development publishers serialize on the shared mutable :dev alias. Immutable
+    # default/version aliases remain isolated by their verified commit identity.
     concurrency:
-      group: wallet-image-immutable-${{ github.repository }}-${{ needs.build.outputs.commit_sha }}
+      group: wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.publish_mode == 'dev' && 'dev' || needs.build.outputs.commit_sha }}
       cancel-in-progress: false
     permissions:
       actions: read

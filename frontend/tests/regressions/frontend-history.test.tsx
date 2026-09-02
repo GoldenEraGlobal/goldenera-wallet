@@ -25,36 +25,40 @@ vi.mock('@project/api', async (importOriginal) => {
   }
 })
 import { TransferList } from '../../packages/core/src/components/TransferList'
+import { PullToRefresh } from '../../packages/ui/src/components/ui/pull-to-refresh'
 
 beforeEach(() => { state.pages = 3; state.calls = []; state.error = false; state.noData = false; state.missingCounts = false; state.address = '0x1111111111111111111111111111111111111111' })
 afterEach(() => cleanup())
 const next = () => fireEvent.click(screen.getByLabelText('Go to next page'))
+const history = (props: React.ComponentProps<typeof TransferList> = {}) => (
+  <PullToRefresh><TransferList {...props} /></PullToRefresh>
+)
 
 describe('F8 history page identity', () => {
   it('starts a changed filter on page zero, without requesting a stale later page', () => {
-    const view = render(<TransferList tokenDecimals={0} />)
+    const view = render(history({ tokenDecimals: 0 }))
     next(); next()
     expect(state.calls.at(-1).pageNumber).toBe(2)
-    view.rerender(<TransferList tokenDecimals={0} transferType="BURN" />)
+    view.rerender(history({ tokenDecimals: 0, transferType: 'BURN' }))
     expect(state.calls.at(-1)).toMatchObject({ transferType: 'BURN', pageNumber: 0 })
     expect(state.calls.filter(call => call.transferType === 'BURN').every(call => call.pageNumber === 0)).toBe(true)
     expect(screen.queryByText('No transactions yet')).toBeNull()
   })
   it('resets when wallet or token changes', () => {
-    const view = render(<TransferList />)
+    const view = render(history())
     next(); next()
     state.address = '0x3333333333333333333333333333333333333333'
-    view.rerender(<TransferList />)
+    view.rerender(history())
     expect(state.calls.at(-1).pageNumber).toBe(0)
     next()
-    view.rerender(<TransferList tokenAddress="0x4444444444444444444444444444444444444444" />)
+    view.rerender(history({ tokenAddress: '0x4444444444444444444444444444444444444444' }))
     expect(state.calls.at(-1).pageNumber).toBe(0)
   })
   it('recovers automatically when polling shrinks total pages', () => {
-    const view = render(<TransferList />)
+    const view = render(history())
     next(); next()
     state.pages = 1
-    view.rerender(<TransferList />)
+    view.rerender(history())
     expect(state.calls.at(-1).pageNumber).toBe(0)
     expect(screen.queryByText('No transactions yet')).toBeNull()
   })
@@ -62,21 +66,21 @@ describe('F8 history page identity', () => {
   it('shows an initial API failure instead of a legitimate empty-history state', () => {
     state.error = true
     state.noData = true
-    render(<TransferList />)
+    render(history())
     expect(screen.getByText(/Transfer history could not be refreshed/)).toBeTruthy()
     expect(screen.queryByText('No transactions yet')).toBeNull()
   })
 
   it('keeps stale history visible while reporting a refresh failure', () => {
     state.error = true
-    render(<TransferList />)
+    render(history())
     expect(screen.getByText(/Transfer history could not be refreshed/)).toBeTruthy()
     expect(screen.getByText('received')).toBeTruthy()
   })
 
   it('fails closed when required transfer totals are missing', () => {
     state.missingCounts = true
-    render(<TransferList />)
+    render(history())
     expect(screen.getByText(/Transfer history could not be refreshed/)).toBeTruthy()
     expect(screen.queryByText('No transactions yet')).toBeNull()
     expect(screen.queryByText(/ total$/)).toBeNull()

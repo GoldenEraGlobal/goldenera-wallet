@@ -56,6 +56,47 @@ assert_current_default_head() {
   }
 }
 
+read_current_source_branch_identity() {
+  require_release_env GH_TOKEN GRAPHQL_URL REPOSITORY RUNNER_TEMP SOURCE_BRANCH || return 1
+  local owner repository_name qualified payload response
+  IFS='/' read -r owner repository_name <<< "$REPOSITORY"
+  [[ -n "$owner" && -n "$repository_name" && "$repository_name" != */* ]] || {
+    echo 'GitHub repository identity is malformed.' >&2
+    return 1
+  }
+  git check-ref-format "refs/heads/$SOURCE_BRANCH" > /dev/null || {
+    echo 'Source branch is not a valid Git branch ref.' >&2
+    return 1
+  }
+  qualified="refs/heads/$SOURCE_BRANCH"
+  payload="$(jq -nc --arg owner "$owner" --arg name "$repository_name" --arg qualified "$qualified" '{
+    query: "query($owner:String!,$name:String!,$qualified:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualified){target{oid}}}}",
+    variables: {owner: $owner, name: $name, qualified: $qualified}
+  }')" || return 1
+  response="$RUNNER_TEMP/source-branch-identity.json"
+  curl --fail --silent --show-error --retry 3 \
+    --request POST \
+    --header "Authorization: Bearer $GH_TOKEN" \
+    --header 'Content-Type: application/json' \
+    --data "$payload" \
+    "$GRAPHQL_URL" > "$response" || return 1
+  jq -e '((.errors // []) | length) == 0 and .data.repository.ref != null' "$response" > /dev/null || return 1
+  CURRENT_SOURCE_BRANCH_HEAD="$(jq -er '.data.repository.ref.target.oid' "$response")" || return 1
+  [[ "$CURRENT_SOURCE_BRANCH_HEAD" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'Current source-branch head is not a full commit SHA.' >&2
+    return 1
+  }
+}
+
+assert_current_source_branch_head() {
+  require_release_env COMMIT_SHA SOURCE_BRANCH || return 1
+  read_current_source_branch_identity || return 1
+  [[ "$CURRENT_SOURCE_BRANCH_HEAD" == "$COMMIT_SHA" ]] || {
+    echo 'Development publication is no longer running for the current source-branch head.' >&2
+    return 1
+  }
+}
+
 assert_release_version_shape() {
   require_release_env COMMIT_SHA CONSUMED_RELEASE_VERSION RELEASE_TAG VERSION || return 1
   [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || {

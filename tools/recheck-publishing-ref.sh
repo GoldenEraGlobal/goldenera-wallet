@@ -8,6 +8,9 @@ case "$MODE" in
   default)
     assert_current_default_head
     ;;
+  dev)
+    assert_current_source_branch_head
+    ;;
   version)
     assert_version_publication_ready
     ;;

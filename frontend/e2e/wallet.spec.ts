@@ -4,6 +4,24 @@ import { test, expect, importPublicWallet, openSettings, TEST_PASSWORD, PUBLIC_A
 const require = createRequire(new URL('../packages/core/package.json', import.meta.url))
 const { decodeTx } = require('@goldenera/cryptoj') as { decodeTx: (hex: string) => { amount: bigint; nonce: bigint; recipient: string; sender: string } }
 
+test('centers the create/import wallet card in the full welcome viewport', async ({ page }) => {
+  await page.goto('/')
+  const card = page.getByText('GoldenEra Wallet', { exact: true }).locator('xpath=ancestor::*[@data-slot="card"]')
+  await expect(card).toBeVisible()
+
+  const position = await card.evaluate(element => {
+    const bounds = element.getBoundingClientRect()
+    return {
+      cardCenterX: bounds.left + bounds.width / 2,
+      cardCenterY: bounds.top + bounds.height / 2,
+      viewportCenterX: window.innerWidth / 2,
+      viewportCenterY: window.innerHeight / 2,
+    }
+  })
+  expect(Math.abs(position.cardCenterX - position.viewportCenterX)).toBeLessThanOrEqual(1)
+  expect(Math.abs(position.cardCenterY - position.viewportCenterY)).toBeLessThanOrEqual(1)
+})
+
 test('creates a wallet, requires backup, and persists it across a page reload', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Create New Wallet', exact: true }).click()

@@ -23,6 +23,7 @@
  */
 package global.goldenera.wallet.service.business;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,12 +36,16 @@ import org.springframework.stereotype.Service;
 import global.goldenera.cryptoj.datatypes.Address;
 import global.goldenera.cryptoj.datatypes.Hash;
 import global.goldenera.wallet.api.core.v1.governance.dtos.AuthorityStatusDtoV1;
+import global.goldenera.wallet.api.core.v1.governance.dtos.AddressAliasOptionDtoV1;
 import global.goldenera.wallet.api.core.v1.governance.dtos.BipDtoV1;
 import global.goldenera.wallet.api.core.v1.governance.dtos.BipMetadataDtoV1;
 import global.goldenera.wallet.api.core.v1.governance.dtos.BipPageDtoV1;
+import global.goldenera.wallet.api.core.v1.governance.dtos.GovernanceOptionsDtoV1;
+import global.goldenera.wallet.api.core.v1.governance.dtos.ValidatorOptionDtoV1;
 import global.goldenera.wallet.exceptions.GEFailedException;
 import global.goldenera.wallet.service.node.GovernanceNodeService;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAuthorityPage;
+import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAddressAliasPage;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBip;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBipMetadata;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBipPage;
@@ -97,6 +102,51 @@ public class GovernanceBusinessService {
             throw invalidNodeResponse("BIP hash");
         }
         return bip;
+    }
+
+    public GovernanceOptionsDtoV1 getOptions() {
+        var authorities = governanceNodeService.getAuthorities();
+        NodeAddressAliasPage aliases = governanceNodeService.getAddressAliases();
+        var validators = governanceNodeService.getValidators();
+        if (authorities == null || authorities.size() > 10_000 || aliases == null || aliases.list() == null
+                || aliases.totalElements() == null || aliases.totalElements() < 0 || aliases.totalPages() == null
+                || aliases.totalPages() < 0 || aliases.list().size() > 100 || validators == null
+                || validators.size() > 10_000) {
+            throw invalidNodeResponse("governance options");
+        }
+        List<Address> authorityOptions = authorities.stream().map(item -> {
+            if (item == null || item.address() == null) {
+                throw invalidNodeResponse("authority option");
+            }
+            return parseAddress(item.address(), "authority option");
+        }).toList();
+        List<AddressAliasOptionDtoV1> aliasOptions = aliases.list().stream().map(item -> {
+            if (item == null || item.alias() == null || item.alias().isBlank() || item.alias().length() > 256
+                    || item.address() == null) {
+                throw invalidNodeResponse("address alias option");
+            }
+            return new AddressAliasOptionDtoV1(item.alias(), parseAddress(item.address(), "address alias option"));
+        }).toList();
+        List<ValidatorOptionDtoV1> validatorOptions = validators.stream().map(item -> {
+            boolean invalidMiningPolicy = item != null && item.miningLimitMode() != null
+                    && item.maxMiningShareBps() != null
+                    && (item.miningLimitMode().equals("LIMITED")
+                            ? item.maxMiningShareBps() < 1 || item.maxMiningShareBps() > 4_000
+                            : !item.miningLimitMode().equals("UNLIMITED") || item.maxMiningShareBps() != 0);
+            if (item == null || item.address() == null || item.miningLimitMode() == null
+                    || item.maxMiningShareBps() == null || invalidMiningPolicy) {
+                throw invalidNodeResponse("validator option");
+            }
+            return new ValidatorOptionDtoV1(
+                    parseAddress(item.address(), "validator option"),
+                    item.miningLimitMode(),
+                    Long.toString(item.maxMiningShareBps()));
+        }).toList();
+        return new GovernanceOptionsDtoV1(
+                authorityOptions,
+                aliasOptions,
+                validatorOptions,
+                aliases.totalElements() > aliases.list().size());
     }
 
     private BipDtoV1 mapBip(NodeBip bip) {
@@ -173,7 +223,7 @@ public class GovernanceBusinessService {
         }
     }
 
-    private static java.time.Instant instant(OffsetDateTime value) {
+    private static Instant instant(OffsetDateTime value) {
         return value == null ? null : value.toInstant();
     }
 

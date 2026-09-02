@@ -33,6 +33,7 @@ import global.goldenera.cryptoj.datatypes.Hash;
 import global.goldenera.wallet.api.core.v1.governance.dtos.AuthorityStatusDtoV1;
 import global.goldenera.wallet.api.core.v1.governance.dtos.BipDtoV1;
 import global.goldenera.wallet.api.core.v1.governance.dtos.BipPageDtoV1;
+import global.goldenera.wallet.api.core.v1.governance.dtos.GovernanceOptionsDtoV1;
 import global.goldenera.wallet.service.business.GovernanceBusinessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,5 +71,11 @@ public class GovernanceApiV1 {
     @Operation(summary = "Get a BIP by its creation transaction hash")
     public BipDtoV1 getBip(@RequestParam Hash hash) {
         return governanceBusinessService.getBip(hash);
+    }
+
+    @GetMapping("/options")
+    @Operation(summary = "Get current entities available to BIP creation forms")
+    public GovernanceOptionsDtoV1 getOptions() {
+        return governanceBusinessService.getOptions();
     }
 }

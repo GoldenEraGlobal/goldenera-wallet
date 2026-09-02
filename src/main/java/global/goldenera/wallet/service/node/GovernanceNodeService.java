@@ -27,6 +27,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
@@ -82,6 +83,34 @@ public class GovernanceNodeService {
                 .body(NodeBip.class);
     }
 
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
+    public List<NodeAuthority> getAuthorities() {
+        return nodeRestClient.get()
+                .uri("/api/explorer/v1/authority/list")
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+    }
+
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
+    public NodeAddressAliasPage getAddressAliases() {
+        return nodeRestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/explorer/v1/address-alias/page")
+                        .queryParam("pageNumber", 0)
+                        .queryParam("pageSize", 100)
+                        .queryParam("direction", "ASC")
+                        .build())
+                .retrieve()
+                .body(NodeAddressAliasPage.class);
+    }
+
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
+    public List<NodeValidator> getValidators() {
+        return nodeRestClient.get()
+                .uri("/api/explorer/v1/validator/list")
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+    }
+
     private record NodeAuthorityRequest(int pageNumber, int pageSize, List<String> addresses) {
     }
 
@@ -89,6 +118,15 @@ public class GovernanceNodeService {
     }
 
     public record NodeAuthorityPage(List<NodeAuthority> list, Integer totalPages, Long totalElements) {
+    }
+
+    public record NodeAddressAlias(String alias, String address) {
+    }
+
+    public record NodeAddressAliasPage(List<NodeAddressAlias> list, Integer totalPages, Long totalElements) {
+    }
+
+    public record NodeValidator(String address, String miningLimitMode, Long maxMiningShareBps) {
     }
 
     public record NodeBipMetadata(String version, String txVersion, String derivedTokenAddress,

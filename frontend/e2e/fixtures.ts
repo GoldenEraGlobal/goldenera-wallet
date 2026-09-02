@@ -15,6 +15,28 @@ export const tokens = [
   { address: '0x3333333333333333333333333333333333333333', name: 'Whole Units Test', smallestUnitName: 'WHOLE', numberOfDecimals: 0, userBurnable: true },
   { address: '0x4444444444444444444444444444444444444444', name: 'High Precision Test', smallestUnitName: 'HIGH', numberOfDecimals: 18, userBurnable: true },
 ]
+export const GOVERNANCE_BIP_HASH = `0x${'aa'.repeat(32)}`
+export const governanceBip = {
+  bipHash: GOVERNANCE_BIP_HASH,
+  status: 'PENDING',
+  actionExecuted: false,
+  type: 'AUTHORITY_ADD',
+  numberOfRequiredVotes: '2',
+  approvers: [RECIPIENT],
+  disapprovers: ['0x5555555555555555555555555555555555555555'],
+  executedAtTimestamp: null,
+  expirationTimestamp: '2026-09-10T12:00:00Z',
+  createdAtBlockHeight: '100',
+  createdAtTimestamp: '2026-09-01T12:00:00Z',
+  updatedAtBlockHeight: '101',
+  updatedAtTimestamp: '2026-09-01T12:01:00Z',
+  updatedByTxHash: GOVERNANCE_BIP_HASH,
+  metadata: {
+    txVersion: 'V1',
+    derivedTokenAddress: null,
+    txPayload: { payloadType: 'BIP_AUTHORITY_ADD', payloadVersion: 'V1', authorityAddress: RECIPIENT },
+  },
+}
 
 export interface MockApi {
   submitted: Array<{ hexData: string }>
@@ -60,7 +82,16 @@ export const test = base.extend<{ api: MockApi }>({
       if (url.pathname.endsWith('/governance/bips')) {
         const pageNumber = Number(url.searchParams.get('pageNumber') ?? 0)
         const pageSize = Number(url.searchParams.get('pageSize') ?? 20)
-        return reply({ content: [], pageNumber, pageSize, totalElements: '0', totalPages: 0, first: true, last: true })
+        return reply({ content: [governanceBip], pageNumber, pageSize, totalElements: '1', totalPages: 1, first: true, last: true })
+      }
+      if (url.pathname.endsWith('/governance/bip')) return reply(governanceBip)
+      if (url.pathname.endsWith('/governance/options')) {
+        return reply({
+          authorities: [PUBLIC_ADDRESS, RECIPIENT],
+          addressAliases: [{ alias: 'treasury', address: RECIPIENT }],
+          validators: [{ address: RECIPIENT, miningLimitMode: 'LIMITED', maxMiningShareBps: '2500' }],
+          addressAliasesTruncated: false,
+        })
       }
       if (url.pathname.endsWith('/wallet/tokens')) return reply(tokens)
       if (url.pathname.endsWith('/wallet/token')) {

@@ -19,9 +19,11 @@ export const WelcomePage: ActivityComponentType<'WelcomePage'> = () => {
           <CardContent><Button className="w-full" onClick={() => void initialize()}>Retry loading wallet</Button></CardContent>
         </Card>
       ) : status === 'no_wallet' ? (
-        <div className="w-full space-y-4">
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-          <WelcomeCard />
+        <div className="flex min-h-full w-full items-center justify-center">
+          <div className="w-full max-w-sm space-y-4">
+            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+            <WelcomeCard />
+          </div>
         </div>
       ) : (
         <div className="w-full space-y-4">

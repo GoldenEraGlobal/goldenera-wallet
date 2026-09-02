@@ -564,7 +564,8 @@ class BackendCompatibilityTest {
                 transactionStatusPath,
                 "/api/core/v1/governance/authority-status",
                 "/api/core/v1/governance/bips",
-                "/api/core/v1/governance/bip");
+                "/api/core/v1/governance/bip",
+                "/api/core/v1/governance/options");
         assertThat(currentPaths).containsAll(baselinePaths).contains(transactionStatusPath)
                 .containsAll(addedPaths)
                 .hasSize(baselinePaths.size() + addedPaths.size());

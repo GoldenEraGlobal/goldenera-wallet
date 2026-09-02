@@ -18,9 +18,12 @@ import global.goldenera.wallet.service.business.GovernanceBusinessService;
 import global.goldenera.wallet.service.node.GovernanceNodeService;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAuthority;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAuthorityPage;
+import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAddressAlias;
+import global.goldenera.wallet.service.node.GovernanceNodeService.NodeAddressAliasPage;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBip;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBipMetadata;
 import global.goldenera.wallet.service.node.GovernanceNodeService.NodeBipPage;
+import global.goldenera.wallet.service.node.GovernanceNodeService.NodeValidator;
 
 class GovernanceBusinessServiceTest {
 
@@ -68,6 +71,30 @@ class GovernanceBusinessServiceTest {
                 new NodeBipMetadata("V1", "V1", null, Map.of("payloadType", "BIP_AUTHORITY_ADD")));
         when(node.getBip(BIP_HASH)).thenReturn(invalid);
         assertThatThrownBy(() -> service.getBip(BIP_HASH)).isInstanceOf(GEFailedException.class);
+    }
+
+    @Test
+    void optionsExposeCurrentAuthoritiesAliasesAndValidatorPolicies() {
+        Address other = Address.fromHexString("0x2222222222222222222222222222222222222222");
+        when(node.getAuthorities()).thenReturn(List.of(new NodeAuthority(AUTHORITY.toChecksumAddress())));
+        when(node.getAddressAliases()).thenReturn(new NodeAddressAliasPage(
+                List.of(new NodeAddressAlias("treasury", other.toChecksumAddress())), 1, 1L));
+        when(node.getValidators()).thenReturn(List.of(
+                new NodeValidator(other.toChecksumAddress(), "LIMITED", 2_500L)));
+
+        var options = service.getOptions();
+
+        assertThat(options.authorities()).containsExactly(AUTHORITY);
+        assertThat(options.addressAliases()).singleElement().satisfies(alias -> {
+            assertThat(alias.alias()).isEqualTo("treasury");
+            assertThat(alias.address()).isEqualTo(other);
+        });
+        assertThat(options.validators()).singleElement().satisfies(validator -> {
+            assertThat(validator.address()).isEqualTo(other);
+            assertThat(validator.miningLimitMode()).isEqualTo("LIMITED");
+            assertThat(validator.maxMiningShareBps()).isEqualTo("2500");
+        });
+        assertThat(options.addressAliasesTruncated()).isFalse();
     }
 
     private static NodeBip bip() {

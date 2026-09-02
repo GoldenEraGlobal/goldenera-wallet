@@ -36,7 +36,7 @@ export const TokenSelect = ({ value, onChange, disabled, className, name }: Toke
     return (
         <Select
             value={selectedToken}
-            onValueChange={setSelectedToken as any}
+            onValueChange={nextValue => setSelectedToken(nextValue)}
             disabled={disabled || isLoadingTokens}
             name={name}
         >

@@ -5,6 +5,8 @@ export { getBipQueryKey, getBipQueryOptions, useGetBipHook } from './governanceA
 export { getBipSuspenseQueryKey, getBipSuspenseQueryOptions, useGetBipSuspenseHook } from './governanceAPIV1/useGetBipSuspenseHook'
 export { getBipsQueryKey, getBipsQueryOptions, useGetBipsHook } from './governanceAPIV1/useGetBipsHook'
 export { getBipsSuspenseQueryKey, getBipsSuspenseQueryOptions, useGetBipsSuspenseHook } from './governanceAPIV1/useGetBipsSuspenseHook'
+export { getOptionsQueryKey, getOptionsQueryOptions, useGetOptionsHook } from './governanceAPIV1/useGetOptionsHook'
+export { getOptionsSuspenseQueryKey, getOptionsSuspenseQueryOptions, useGetOptionsSuspenseHook } from './governanceAPIV1/useGetOptionsSuspenseHook'
 export { receiveWebhookMutationKey, receiveWebhookMutationOptions, useReceiveWebhookHook } from './nodeWebhookApiV1/useReceiveWebhookHook'
 export { getBalancesQueryKey, getBalancesQueryOptions, useGetBalancesHook } from './walletAPIV1/useGetBalancesHook'
 export { getBalancesSuspenseQueryKey, getBalancesSuspenseQueryOptions, useGetBalancesSuspenseHook } from './walletAPIV1/useGetBalancesSuspenseHook'

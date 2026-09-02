@@ -16,7 +16,7 @@ import {
   Spinner,
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
-import { FilePlus2, Vote } from 'lucide-react'
+import { FilePlus2, RefreshCw, Vote } from 'lucide-react'
 import { useState } from 'react'
 import { AppLayout } from '../layouts/Layouts'
 import { useFlow } from '../router/useFlow'
@@ -36,11 +36,16 @@ export const GovernancePage: ActivityComponentType<'GovernancePage'> = () => {
   )
   const bips = useGetBipsHook(
     { query: { pageNumber, pageSize: 20, status: status === 'ALL' ? undefined : status } },
-    { query: { enabled: authority.data?.authority === true } },
+    { query: { enabled: authority.data?.authority === true, refetchInterval: 5_000 } },
   )
 
   return (
-    <AppLayout title="Governance">
+    <AppLayout title="Governance" actionButton={
+      <Button variant="ghost" size="icon" aria-label="Refresh BIPs" disabled={bips.isFetching}
+        onClick={() => void bips.refetch()}>
+        <RefreshCw className={`h-5 w-5 ${bips.isFetching ? 'animate-spin' : ''}`} />
+      </Button>
+    }>
       <div className="space-y-4">
         {authority.isLoading && <div className="flex justify-center py-10"><Spinner /></div>}
         {authority.isError && (
@@ -56,7 +61,7 @@ export const GovernancePage: ActivityComponentType<'GovernancePage'> = () => {
                 <FilePlus2 className="h-4 w-4" /> Create BIP
               </Button>
               <Select value={status} onValueChange={value => { setStatus(value as typeof status); setPageNumber(0) }}>
-                <SelectTrigger className="flex-1"><SelectValue>{status === 'ALL' ? 'All statuses' : bipStatusLabels[status]}</SelectValue></SelectTrigger>
+                <SelectTrigger className="h-9 flex-1 px-2.5 text-sm" size="lg"><SelectValue>{status === 'ALL' ? 'All statuses' : bipStatusLabels[status]}</SelectValue></SelectTrigger>
                 <SelectContent>
                   {statusOptions.map(option => (
                     <SelectItem key={option} value={option}>{option === 'ALL' ? 'All statuses' : bipStatusLabels[option]}</SelectItem>

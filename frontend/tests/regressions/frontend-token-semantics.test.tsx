@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   tokensResult: {} as any,
   balancesResult: {} as any,
   tokenInfoResult: {} as any,
+  authorityResult: { data: { authority: false }, isLoading: false, isError: false } as any,
 }))
 
 vi.mock('@project/api', async (importOriginal) => {
@@ -18,6 +19,7 @@ vi.mock('@project/api', async (importOriginal) => {
     useGetTokensHook: () => state.tokensResult,
     useGetBalancesHook: () => state.balancesResult,
     useGetTokenByAddressHook: () => state.tokenInfoResult,
+    useGetAuthorityStatusHook: () => state.authorityResult,
   }
 })
 vi.mock('@project/ui', () => {
@@ -103,6 +105,7 @@ const refetch = vi.fn(async () => ({}))
 const tokenAddress = '0x2222222222222222222222222222222222222222'
 
 beforeEach(() => {
+  state.authorityResult = { data: { authority: false }, isLoading: false, isError: false }
   state.tokensResult = {
     data: [
       {
@@ -141,6 +144,21 @@ afterEach(() => {
 })
 
 describe('token amount semantics', () => {
+  it('hides governance from wallets that are not authorities', () => {
+    state.authorityResult = { data: { authority: false }, isLoading: false, isError: false }
+    render(<DashboardPage />)
+
+    expect(screen.queryByRole('button', { name: /Governance/ })).toBeNull()
+  })
+
+  it('shows governance only after current authority membership is confirmed', () => {
+    state.authorityResult = { data: { authority: true }, isLoading: false, isError: false }
+    render(<DashboardPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Governance/ }))
+    expect(state.push).toHaveBeenCalledWith('GovernancePage', {})
+  })
+
   it('does not fabricate a zero USD total for nonzero dashboard holdings without pricing', () => {
     state.balancesResult.data = [
       {

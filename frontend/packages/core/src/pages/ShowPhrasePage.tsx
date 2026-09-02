@@ -4,16 +4,18 @@ import {
     Card, CardContent
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
-import { AlertTriangle, Eye, EyeOff } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Eye, EyeOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { UnlockCard } from '../components/auth/UnlockCard'
 import { MnemonicGrid } from '../components/MnemonicGrid'
+import { useCopy } from '../hooks/useCopy'
 import { AppLayout } from '../layouts/Layouts'
 import { privacyScreen } from '../utils/PrivacyUtil'
 
 export const ShowPhrasePage: ActivityComponentType<'ShowPhrasePage'> = () => {
     const [mnemonic, setMnemonic] = useState<string | null>(null)
     const [showMnemonic, setShowMnemonic] = useState(false)
+    const { copy, copied, copyFailed } = useCopy()
 
     useEffect(() => {
         return privacyScreen()
@@ -70,6 +72,17 @@ export const ShowPhrasePage: ActivityComponentType<'ShowPhrasePage'> = () => {
                                         Show
                                     </>
                                 )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                disabled={!showMnemonic}
+                                onClick={() => void copy(mnemonic)}
+                            >
+                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                {copyFailed ? 'Copy failed' : copied ? 'Copied' : 'Copy'}
                             </Button>
                         </div>
                     </CardContent>

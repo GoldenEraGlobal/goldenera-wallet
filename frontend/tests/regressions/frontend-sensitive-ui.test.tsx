@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mnemonic = 'alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima'
+const clipboardWrite = vi.fn(async () => undefined)
 const wallet = vi.hoisted(() => ({
   backupWallet: vi.fn(async () => {}),
   backupPhrase: '',
@@ -55,6 +56,10 @@ beforeEach(() => {
     configurable: true,
     value: 'visible',
   })
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: clipboardWrite },
+  })
 })
 
 afterEach(() => {
@@ -83,6 +88,24 @@ const authenticateAndReveal = async () => {
 }
 
 describe('recovery phrase DOM exposure', () => {
+  it('enables copying only while the authenticated recovery phrase is visible', async () => {
+    render(<ShowPhrasePage params={{}} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }))
+      await Promise.resolve()
+    })
+    expect((screen.getByRole('button', { name: 'Copy' }) as HTMLButtonElement).disabled).toBe(true)
+
+    await reveal()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+      await Promise.resolve()
+    })
+    expect(clipboardWrite).toHaveBeenCalledWith(mnemonic)
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+  })
+
   it('renders placeholders rather than secret words while the grid is hidden', async () => {
     render(<MnemonicGrid mnemonic={mnemonic} />)
 

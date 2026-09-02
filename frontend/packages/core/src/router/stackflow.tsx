@@ -9,10 +9,13 @@ import type { History } from 'history'
 import { useEffect, useState } from 'react'
 import {
     BackupPhrasePage,
+    BipCreatePage,
+    BipDetailPage,
     CreateWalletPage,
     DashboardPage,
     DeleteWalletPage,
     ImportWalletPage,
+    GovernancePage,
     ScanQrCodePage,
     SettingsPage,
     ShowPhrasePage,
@@ -50,6 +53,7 @@ const transitionDuration = useWebRenderer ? 0 : TRANSITION_DURATION
 const components = {
     ShowPhrasePage, DashboardPage, SettingsPage, ToggleBiometricPage,
     DeleteWalletPage, TokenDetailPage, ScanQrCodePage, TxSubmitPage,
+    GovernancePage, BipCreatePage, BipDetailPage,
     WelcomePage, CreateWalletPage, ImportWalletPage, BackupPhrasePage,
 }
 
@@ -64,6 +68,9 @@ const authenticatedConfig = defineConfig({
         { name: 'ToggleBiometricPage', route: '/toggle-biometric' },
         { name: 'TokenDetailPage', route: '/token/:tokenAddress' },
         { name: 'TxSubmitPage', route: '/tx-submit' },
+        { name: 'GovernancePage', route: '/governance' },
+        { name: 'BipCreatePage', route: '/governance/create' },
+        { name: 'BipDetailPage', route: '/governance/bip/:hash' },
     ],
 })
 const unauthenticatedConfig = defineConfig({
@@ -232,4 +239,7 @@ export type TypeActivities = {
     ImportWalletPage: typeof ImportWalletPage
     BackupPhrasePage: typeof BackupPhrasePage
     TxSubmitPage: typeof TxSubmitPage
+    GovernancePage: typeof GovernancePage
+    BipCreatePage: typeof BipCreatePage
+    BipDetailPage: typeof BipDetailPage
 }

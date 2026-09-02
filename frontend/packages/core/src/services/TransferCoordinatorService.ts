@@ -3,6 +3,7 @@ import {
   getMempoolRecommendedFees,
   getNextNonce,
   getTransactionStatus,
+  normalizeApiInteger,
   submitTransaction,
 } from '@project/api'
 import type { PrivateKey } from '@goldenera/cryptoj'
@@ -53,7 +54,7 @@ const productionDependencies: TransferCoordinatorDependencies = {
   getPrivateKey: getPrivateKeyForAuthorization,
   getNextNonce: async (sender, signal) => {
     const response = await getNextNonce({ query: { address: sender }, signal })
-    return response.data
+    return normalizeApiInteger(response.data, 'next nonce')
   },
   getBalances: async (request, signal) => {
     const response = await getBalances({

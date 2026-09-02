@@ -14,7 +14,8 @@ import {
   TooltipTrigger,
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
-import { ArrowUpRight, CopyIcon, Lock, QrCode, Settings } from 'lucide-react'
+import { useGetAuthorityStatusHook } from '@project/api'
+import { ArrowUpRight, CopyIcon, Landmark, Lock, QrCode, Settings } from 'lucide-react'
 import { TokenList } from '../components/TokenList'
 import { useBarcodeIsSupported } from '../hooks/useBarcodeIsSupported'
 import { useCopy } from '../hooks/useCopy'
@@ -30,6 +31,10 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
   const error = useWalletStore((state) => state.error)
   const clearError = useWalletStore((state) => state.clearError)
   const supportedScan = useBarcodeIsSupported()
+  const authority = useGetAuthorityStatusHook(
+    { query: { address: address ?? '' } },
+    { query: { enabled: !!address, staleTime: 15_000 } },
+  )
 
   const handleLock = async () => {
     try { await lockWallet() } catch { /* The store reports a local-only lock warning. */ }
@@ -132,6 +137,17 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
             >
               <QrCode className="h-5 w-5" />
               <span className="text-xs">Scan</span>
+            </Button>
+          )}
+          {authority.data?.authority === true && (
+            <Button
+              size="lg"
+              variant="outline"
+              className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0"
+              onClick={() => push('GovernancePage', {})}
+            >
+              <Landmark className="h-5 w-5" />
+              <span className="text-xs">Governance</span>
             </Button>
           )}
         </div>

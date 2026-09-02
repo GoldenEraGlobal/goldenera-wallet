@@ -1,4 +1,7 @@
+export { getAuthorityStatus } from './getAuthorityStatus'
 export { getBalances } from './getBalances'
+export { getBip } from './getBip'
+export { getBips } from './getBips'
 export { getMempoolRecommendedFees } from './getMempoolRecommendedFees'
 export { getNextNonce } from './getNextNonce'
 export { getTokenByAddress } from './getTokenByAddress'

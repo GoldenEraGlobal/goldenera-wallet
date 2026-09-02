@@ -1,5 +1,6 @@
 import type { TokenDetailPageProps } from '../pages/TokenDetailPage'
 import type { TxSubmitPageProps } from '../pages/TxSubmitPage'
+import type { BipDetailPageProps } from '../pages/BipDetailPage'
 
 declare module '@stackflow/config' {
   interface Register {
@@ -15,5 +16,8 @@ declare module '@stackflow/config' {
     ImportWalletPage: Record<string, never>
     BackupPhrasePage: Record<string, never>
     TxSubmitPage: TxSubmitPageProps
+    GovernancePage: Record<string, never>
+    BipCreatePage: Record<string, never>
+    BipDetailPage: BipDetailPageProps
   }
 }

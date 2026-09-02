@@ -67,6 +67,9 @@ public class CoreRoutePolicyRegistry {
                 get("/api/core/v1/wallet/transaction-status", 10),
                 post("/api/core/v1/wallet/submit-tx", SIGNED_TX_REQUEST_BYTES, 10, true),
                 get("/api/core/v1/wallet/mempool-recommended-fees", DEFAULT_COST),
+                get("/api/core/v1/governance/authority-status", DEFAULT_COST),
+                get("/api/core/v1/governance/bips", 3),
+                get("/api/core/v1/governance/bip", DEFAULT_COST),
                 post("/api/core/v1/device/register", DEVICE_REGISTRATION_REQUEST_BYTES, DEFAULT_COST, true),
                 post("/api/core/v1/node-webhook/handle", WEBHOOK_REQUEST_BYTES, 10, true)));
     }

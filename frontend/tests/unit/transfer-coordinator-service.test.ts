@@ -15,7 +15,10 @@ const preferences = vi.hoisted(() => ({
   set: vi.fn(),
 }))
 
-vi.mock('@project/api', () => api)
+vi.mock('@project/api', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ...api,
+}))
 vi.mock('@capacitor/preferences', () => ({
   Preferences: {
     get: preferences.get,
@@ -157,8 +160,8 @@ describe('production TransferCoordinator dependencies', () => {
     expect(api.submitTransaction).not.toHaveBeenCalled()
   })
 
-  it('requests only selected/native balances and the exact user-selected fee level', async () => {
-    api.getNextNonce.mockResolvedValue({ data: '7' })
+  it('normalizes a transitional numeric nonce while requesting only the selected balances and fee level', async () => {
+    api.getNextNonce.mockResolvedValue({ data: 7 })
     api.getBalances.mockResolvedValue({ data: [
       { address: sender, tokenAddress: token, balance: '1000000' },
       { address: sender, tokenAddress: native, balance: '1000000' },

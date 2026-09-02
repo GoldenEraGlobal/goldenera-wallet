@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -559,8 +560,14 @@ class BackendCompatibilityTest {
         var baselinePaths = baseline.get("paths").propertyNames();
         var currentPaths = current.get("paths").propertyNames();
         String transactionStatusPath = "/api/core/v1/wallet/transaction-status";
+        Set<String> addedPaths = Set.of(
+                transactionStatusPath,
+                "/api/core/v1/governance/authority-status",
+                "/api/core/v1/governance/bips",
+                "/api/core/v1/governance/bip");
         assertThat(currentPaths).containsAll(baselinePaths).contains(transactionStatusPath)
-                .hasSize(baselinePaths.size() + 1);
+                .containsAll(addedPaths)
+                .hasSize(baselinePaths.size() + addedPaths.size());
         for (String path : baselinePaths) {
             for (String method : baseline.get("paths").get(path).propertyNames()) {
                 assertThat(current.get("paths").get(path).get(method).get("operationId"))

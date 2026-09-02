@@ -48,18 +48,20 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import global.goldenera.wallet.api.core.v1.device.DeviceApiV1;
 import global.goldenera.wallet.api.core.v1.device.mappers.DeviceMapper;
+import global.goldenera.wallet.api.core.v1.governance.GovernanceApiV1;
 import global.goldenera.wallet.api.core.v1.wallet.WalletApiV1;
 import global.goldenera.wallet.api.core.v1.webhook.NodeWebhookApiV1;
 import global.goldenera.wallet.components.WebhookSignatureVerifier;
 import global.goldenera.wallet.config.SpringDocConfig;
 import global.goldenera.wallet.properties.DeviceRegistrationProperties;
 import global.goldenera.wallet.service.business.DeviceBusinessService;
+import global.goldenera.wallet.service.business.GovernanceBusinessService;
 import global.goldenera.wallet.service.business.WalletBusinessService;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Exports the Core API from production MVC controllers without application infrastructure. */
-@WebMvcTest(controllers = { WalletApiV1.class, DeviceApiV1.class, NodeWebhookApiV1.class },
+@WebMvcTest(controllers = { WalletApiV1.class, GovernanceApiV1.class, DeviceApiV1.class, NodeWebhookApiV1.class },
         useDefaultFilters = false,
         properties = {
                 "spring.security.user.name=test",
@@ -76,6 +78,7 @@ import tools.jackson.databind.json.JsonMapper;
 @org.springframework.context.annotation.Import({
         SpringDocConfig.class,
         WalletApiV1.class,
+        GovernanceApiV1.class,
         DeviceApiV1.class,
         NodeWebhookApiV1.class
 })
@@ -86,6 +89,7 @@ class CoreApiOpenApiExportTest {
     @Autowired MockMvc mvc;
 
     @MockitoBean WalletBusinessService walletBusinessService;
+    @MockitoBean GovernanceBusinessService governanceBusinessService;
     @MockitoBean DeviceBusinessService deviceBusinessService;
     @MockitoBean DeviceMapper deviceMapper;
     @MockitoBean DeviceRegistrationProperties deviceRegistrationProperties;

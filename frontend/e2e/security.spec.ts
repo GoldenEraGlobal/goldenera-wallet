@@ -178,9 +178,11 @@ test('legacy biometric recovery requires verification and persists a new passwor
   await page.getByRole('button', { name: /View Recovery Phrase Backup/ }).click()
   await page.getByPlaceholder('Enter your password', { exact: true }).fill(newPassword)
   await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  const copyButton = page.getByRole('button', { name: 'Copy', exact: true })
+  await expect(copyButton).toBeDisabled()
   await page.getByRole('button', { name: 'Show', exact: true }).click()
   await expect(page.getByText(PUBLIC_MNEMONIC.split(' ').at(-1)!, { exact: true })).toHaveCount(1)
-  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0)
+  await expect(copyButton).toBeEnabled()
 })
 
 test('password unlock upgrades existing legacy biometric intent to PRF', async ({ page, context }, testInfo) => {

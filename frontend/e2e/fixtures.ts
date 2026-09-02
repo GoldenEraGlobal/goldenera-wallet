@@ -54,6 +54,14 @@ export const test = base.extend<{ api: MockApi }>({
         return
       }
       const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+      if (url.pathname.endsWith('/governance/authority-status')) {
+        return reply({ address: url.searchParams.get('address'), authority: false })
+      }
+      if (url.pathname.endsWith('/governance/bips')) {
+        const pageNumber = Number(url.searchParams.get('pageNumber') ?? 0)
+        const pageSize = Number(url.searchParams.get('pageSize') ?? 20)
+        return reply({ content: [], pageNumber, pageSize, totalElements: '0', totalPages: 0, first: true, last: true })
+      }
       if (url.pathname.endsWith('/wallet/tokens')) return reply(tokens)
       if (url.pathname.endsWith('/wallet/token')) {
         return reply(tokens.find(token => token.address === url.searchParams.get('address')) ?? tokens[0])

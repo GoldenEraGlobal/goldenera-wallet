@@ -154,7 +154,7 @@ verify_attested_index() {
 
     while IFS=$'\t' read -r predicate_type layer_digest; do
       statement="$RUNNER_TEMP/final-attestation-${layer_digest#sha256:}.json"
-      curl --fail --silent --show-error --retry 3 \
+      curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error --retry 3 \
         --header "Authorization: Bearer $registry_token" \
         "https://$REGISTRY_HOST/v2/$IMAGE_NAME/blobs/$layer_digest" > "$statement"
       [[ "$(sha256sum "$statement" | awk '{print $1}')" == "${layer_digest#sha256:}" ]] || {

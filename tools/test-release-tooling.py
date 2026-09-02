@@ -106,6 +106,7 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     require(images.count('inspect_existing_immutable_alias "$VERSION"') == 1, "Version recovery must inspect the semantic alias")
     require("adopt_existing_manifest" in images and "cmp -s" in images, "Existing immutable aliases must be adopted only when their exact bytes agree")
     require("verify_attested_index" in images and "https://slsa.dev/provenance/v1" in images and "https://spdx.dev/Document" in images, "Adopted and new indexes must verify linked provenance and SBOM")
+    require("curl --fail --location --proto '=https' --proto-redir '=https'" in images, "Attestation blob downloads must follow GHCR redirects without permitting a protocol downgrade")
     require(images.count('publish_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must ensure a full-SHA alias")
     require(images.count('publish_immutable_alias "$VERSION"') == 1, "Version mode must ensure exactly one semantic alias")
     require(images.count('publish_mutable_alias "dev"') == 1, "Development mode must publish exactly one mutable dev alias")

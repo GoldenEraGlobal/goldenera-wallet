@@ -34,15 +34,15 @@ BUILDKIT_IMAGE = (
 )
 BUILDX_VERSION = "v0.25.0"
 ACTION_PINS = {
-    "actions/checkout": "f43a0e5ff2bd294095638e18286ca9a3d1956744",
-    "actions/setup-java": "c5195efecf7bdfc987ee8bae7a71cb8b11521c00",
-    "actions/setup-node": "1e60f620b9541d16bece96c5465dc8ee9832be0b",
-    "actions/upload-artifact": "65462800fd760344b1a7b4382951275a0abb4808",
-    "actions/download-artifact": "fa0a91b85d4f404e444e00e005971372dc801d16",
-    "pnpm/action-setup": "41ff72655975bd51cab0327fa583b6e92b6d3061",
-    "docker/setup-buildx-action": "e468171a9de216ec08956ac3ada2f0791b6bd435",
-    "docker/login-action": "9780b0c442fbb1117ed29e0efdff1e18412f7567",
-    "docker/build-push-action": "263435318d21b8e681c14492fe198d362a7d2c83",
+    "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "actions/setup-java": "03ad4de0992f5dab5e18fcb136590ce7c4a0ac95",
+    "actions/setup-node": "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
+    "actions/upload-artifact": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "actions/download-artifact": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+    "pnpm/setup": "84cb39b217b10273981911c288cd62326dc7c6d2",
+    "docker/setup-buildx-action": "bb05f3f5519dd87d3ba754cc423b652a5edd6d2c",
+    "docker/login-action": "dbcb813823bdd20940b903addbd779551569679f",
+    "docker/build-push-action": "f9f3042f7e2789586610d6e8b85c8f03e5195baf",
 }
 EXPECTED_JOBS = {"build", "build-images", "publish-images", "release"}
 # Exact code/action identities for jobs holding write permissions. Display names
@@ -195,7 +195,7 @@ def verify_actions_and_interpolation(jobs: dict[str, dict[str, Any]]) -> None:
         f"actions/setup-node@{ACTION_PINS['actions/setup-node']}": 1,
         f"actions/upload-artifact@{ACTION_PINS['actions/upload-artifact']}": 2,
         f"actions/download-artifact@{ACTION_PINS['actions/download-artifact']}": 3,
-        f"pnpm/action-setup@{ACTION_PINS['pnpm/action-setup']}": 1,
+        f"pnpm/setup@{ACTION_PINS['pnpm/setup']}": 1,
         f"docker/setup-buildx-action@{ACTION_PINS['docker/setup-buildx-action']}": 1,
         f"docker/login-action@{ACTION_PINS['docker/login-action']}": 1,
         f"docker/build-push-action@{ACTION_PINS['docker/build-push-action']}": 1,
@@ -246,7 +246,18 @@ def verify_build(jobs: dict[str, dict[str, Any]]) -> None:
     build = jobs["build"]
     java = step_named(build, "build", "Set up Java")
     java_inputs = mapping(java.get("with"), "Java setup inputs must be explicit")
-    require(java_inputs == {"distribution": "temurin", "java-version": "25.0.4.1", "cache": "maven", "server-id": "github-cryptoj"}, "CI must restore exact Temurin 25.0.4.1 while the POM keeps Java release 21")
+    require(java_inputs == {
+        "distribution": "temurin",
+        "java-version": "25",
+        "check-latest": True,
+        "cache": "maven",
+        "server-id": "github-cryptoj",
+    }, "CI must resolve the latest stable Temurin 25 while the POM keeps Java release 21")
+    pnpm = step_named(build, "build", "Set up pnpm")
+    require(mapping(pnpm.get("with"), "pnpm setup inputs must be explicit") == {
+        "version": "11.24.0",
+        "install": False,
+    }, "CI must install exact pnpm 11.24.0 without an implicit dependency install")
     node = step_named(build, "build", "Set up Node.js")
     require(mapping(node.get("with"), "Node setup inputs must be explicit") == {
         "node-version": "24.20.0",
@@ -489,14 +500,15 @@ def negative_mutations() -> list[tuple[str, Callable[[str], str]]]:
         ("direct GitHub interpolation", lambda text: replace_once(text, "        run: tools/resolve-build-identity.sh\n", "        run: printf '%s' '${{ github.repository }}'\n")),
         ("unpinned parser", lambda text: replace_once(text, "PyYAML==6.0.2", "PyYAML")),
         ("wrong Maven server ID", lambda text: replace_once(text, "          server-id: github-cryptoj\n", "          server-id: github\n")),
-        ("wrong Java patch", lambda text: replace_once(text, "          java-version: '25.0.4.1'\n", "          java-version: '25'\n")),
+        ("wrong Java major", lambda text: replace_once(text, "          java-version: '25'\n", "          java-version: '21'\n")),
+        ("stale Java patch allowed", lambda text: replace_once(text, "          check-latest: true\n", "          check-latest: false\n")),
         ("wrong Node patch", lambda text: replace_once(text, "          node-version: '24.20.0'\n", "          node-version: '24'\n")),
         ("Maven override removed", lambda text: replace_once(text, "          python3 tools/prepare-local-maven-artifacts.py --output \"$archive\"\n", "          : # checksum override removed\n")),
         ("nondeterministic Maven archive", lambda text: replace_once(text, '-Dproject.build.outputTimestamp="$SOURCE_DATE_EPOCH"', "-DskipTests")),
         ("attestations disabled", lambda text: replace_once(text, "          provenance: mode=max\n          sbom: true\n", "          provenance: false\n          sbom: false\n")),
         ("wrong publication script", lambda text: replace_once(text, "        run: tools/publish-image-aliases.sh\n", "        run: tools/recheck-publishing-ref.sh\n")),
         ("extra privileged run", lambda text: replace_once(text, "      - name: Stage the manifest and publish aliases\n", "      - name: Unreviewed privileged command\n        run: true\n\n      - name: Stage the manifest and publish aliases\n")),
-        ("extra pinned action", lambda text: replace_once(text, "      - name: Validate workflow publication policy\n", "      - name: Unexpected login\n        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567\n\n      - name: Validate workflow publication policy\n")),
+        ("extra pinned action", lambda text: replace_once(text, "      - name: Validate workflow publication policy\n", f"      - name: Unexpected login\n        uses: docker/login-action@{ACTION_PINS['docker/login-action']}\n\n      - name: Validate workflow publication policy\n")),
     ]
 
 

@@ -6,13 +6,13 @@
 import type { MempoolRecommendedFeesLevelDtoV1 } from './MempoolRecommendedFeesLevelDtoV1'
 
 export type MempoolRecommendedFeesDtoV1 = {
-    slow?: MempoolRecommendedFeesLevelDtoV1;
-    standard?: MempoolRecommendedFeesLevelDtoV1;
-    fast?: MempoolRecommendedFeesLevelDtoV1;
+    slow: MempoolRecommendedFeesLevelDtoV1;
+    standard: MempoolRecommendedFeesLevelDtoV1;
+    fast: MempoolRecommendedFeesLevelDtoV1;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal mempool transaction count
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
     */
-    mempoolSize?: bigint;
+    mempoolSize: string;
 };

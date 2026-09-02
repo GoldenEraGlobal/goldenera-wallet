@@ -20,20 +20,6 @@ export type GetBalancesQuery = {
 
 export type GetBalancesStatus200 = WalletBalanceDtoV1[];
 
-export type GetBalancesStatus400 = string;
-
-export type GetBalancesStatus401 = string;
-
-export type GetBalancesStatus404 = string;
-
-export type GetBalancesStatus409 = string;
-
-export type GetBalancesStatus413 = string;
-
-export type GetBalancesStatus500 = string;
-
-export type GetBalancesStatus504 = string;
-
 export type GetBalancesOptions = {
     body?: never;
     path?: never;
@@ -43,16 +29,9 @@ export type GetBalancesOptions = {
 
 export type GetBalancesResponses = {
     "200": GetBalancesStatus200;
-    "400": GetBalancesStatus400;
-    "401": GetBalancesStatus401;
-    "404": GetBalancesStatus404;
-    "409": GetBalancesStatus409;
-    "413": GetBalancesStatus413;
-    "500": GetBalancesStatus500;
-    "504": GetBalancesStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetBalancesResponse = (GetBalancesStatus200 | GetBalancesStatus400 | GetBalancesStatus401 | GetBalancesStatus404 | GetBalancesStatus409 | GetBalancesStatus413 | GetBalancesStatus500 | GetBalancesStatus504);
+export type GetBalancesResponse = GetBalancesStatus200;

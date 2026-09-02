@@ -18,7 +18,12 @@ export const WelcomePage: ActivityComponentType<'WelcomePage'> = () => {
           <CardHeader><CardTitle>Wallet storage unavailable</CardTitle><CardDescription>{error}</CardDescription></CardHeader>
           <CardContent><Button className="w-full" onClick={() => void initialize()}>Retry loading wallet</Button></CardContent>
         </Card>
-      ) : status === 'no_wallet' ? <WelcomeCard /> : (
+      ) : status === 'no_wallet' ? (
+        <div className="w-full space-y-4">
+          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+          <WelcomeCard />
+        </div>
+      ) : (
         <div className="w-full space-y-4">
           {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <UnlockWallet />

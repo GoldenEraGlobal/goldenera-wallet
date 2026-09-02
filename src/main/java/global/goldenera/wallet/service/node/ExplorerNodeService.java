@@ -98,6 +98,12 @@ public class ExplorerNodeService {
     @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public AccountBalanceDtoV1Page getAccountBalancesBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses) {
+        return getAccountBalancesBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public AccountBalanceDtoV1Page getAccountBalancesBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
         var request = new BulkAccountBalancePageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)
@@ -130,6 +136,12 @@ public class ExplorerNodeService {
     @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public MemTransferDtoV1Page getMemTransfersBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses, TransferTypeEnum transferType) {
+        return getMemTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses, transferType);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public MemTransferDtoV1Page getMemTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses, TransferTypeEnum transferType) {
         var request = new BulkMemTransferPageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)
@@ -141,10 +153,22 @@ public class ExplorerNodeService {
     }
 
     @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
-    public MemTransferDtoV1Page getOutgoingMemTransfersBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses) {
+    public MemTransferDtoV1Page getOutgoingMemTransfersBulk(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
+        return getOutgoingMemTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public MemTransferDtoV1Page getOutgoingMemTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
         var request = new BulkMemTransferPageRequestV1().pageNumber(pageNumber).pageSize(pageSize)
                 .direction(BulkMemTransferPageRequestV1.DirectionEnum.DESC)
                 .fromAddresses(addresses.stream().map(Address::toChecksumAddress).collect(Collectors.toSet()));
+        if (!tokenAddresses.isEmpty()) {
+            request.tokenAddresses(tokenAddresses.stream()
+                    .map(Address::toChecksumAddress)
+                    .collect(Collectors.toSet()));
+        }
         return memTransferApi.apiV1MemTransferGetPageBulk(request).getBody();
     }
 
@@ -172,6 +196,12 @@ public class ExplorerNodeService {
     @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TransferDtoV1Page getTransfersBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses, BulkTransferPageRequestV1.TypeEnum transferType) {
+        return getTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses, transferType);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public TransferDtoV1Page getTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses, BulkTransferPageRequestV1.TypeEnum transferType) {
         var request = new BulkTransferPageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)

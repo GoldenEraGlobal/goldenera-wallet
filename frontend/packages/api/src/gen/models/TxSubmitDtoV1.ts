@@ -8,5 +8,11 @@
  * @type object
 */
 export type TxSubmitDtoV1 = {
-    hexData?: string;
+    /**
+     * @minLength 0
+     * @maxLength 200002
+     * @pattern ^0x(?:[0-9a-fA-F]{2})+$
+     * @type string
+    */
+    hexData: string;
 };

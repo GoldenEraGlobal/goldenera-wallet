@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { PrivateKey, TxBuilder, TxType, Network, encodeTx, decodeTx, bytesToHex } from '@goldenera/cryptoj'
-import { CryptoUtil } from '../../packages/core/src/utils/CryptoUtil'
+import { CryptoUtil, EncryptedPayloadCorruptionError } from '../../packages/core/src/utils/CryptoUtil'
 import { WalletUtil } from '../../packages/core/src/utils/WalletUtil'
 import golden from '../fixtures/crypto-v0.2.0.json'
 
@@ -28,7 +28,7 @@ describe('public golden vectors from cryptoj 0.2.0', () => {
   it.each(golden.transfers)('preserves signed wire bytes and hash: $name', (vector) => {
     const seed = golden.seeds[vector.seed]
     const key = PrivateKey.fromMnemonic(seed.mnemonic, seed.passphrase, seed.index)
-    const tx = TxBuilder.create()
+    const builder = TxBuilder.create()
       .type(TxType.TRANSFER)
       .network(Network.MAINNET)
       .timestamp(1700000000000)
@@ -37,9 +37,13 @@ describe('public golden vectors from cryptoj 0.2.0', () => {
       .fee(BigInt(vector.fee))
       .nonce(BigInt(vector.nonce))
       .tokenAddress(vector.tokenAddress as `0x${string}`)
-      .sign(key)
+    const estimatedSignedSize = builder.estimateSize()
+    const tx = builder.sign(key)
+    const encoded = encodeTx(tx, true)
 
-    expect(bytesToHex(encodeTx(tx, true))).toBe(vector.hex)
+    expect(estimatedSignedSize).toBe(tx.size)
+    expect(tx.size).toBe(encoded.length)
+    expect(bytesToHex(encoded)).toBe(vector.hex)
     expect(tx.hash).toBe(vector.hash)
     const decoded = decodeTx(vector.hex as `0x${string}`)
     expect(decoded.amount).toBe(BigInt(vector.amount))
@@ -120,5 +124,29 @@ describe('encrypted mnemonic compatibility', () => {
     const corrupted = JSON.parse(vector.encrypted)
     corrupted.data = (corrupted.data.startsWith('00') ? '01' : '00') + corrupted.data.slice(2)
     expect(await CryptoUtil.decrypt(JSON.stringify(corrupted), vector.password)).toBeNull()
+  })
+
+  it.each([
+    ['non-hexadecimal field', (payload: Record<string, string>) => { payload.iv = 'gg'.repeat(CryptoUtil.IV_LENGTH_BYTES) }],
+    ['odd-length field', (payload: Record<string, string>) => { payload.data = '0'.repeat(CryptoUtil.AES_GCM_TAG_LENGTH_BYTES * 2 - 1) }],
+    ['empty ciphertext', (payload: Record<string, string>) => { payload.data = '' }],
+    ['wrong IV length', (payload: Record<string, string>) => { payload.iv = '00'.repeat(CryptoUtil.IV_LENGTH_BYTES - 1) }],
+    ['wrong salt length', (payload: Record<string, string>) => { payload.salt = '00'.repeat(CryptoUtil.SALT_LENGTH_BYTES - 1) }],
+    ['ciphertext shorter than the GCM tag', (payload: Record<string, string>) => { payload.data = '00'.repeat(CryptoUtil.AES_GCM_TAG_LENGTH_BYTES - 1) }],
+  ])('classifies a %s envelope as storage corruption before decryption', async (_name, mutate) => {
+    const payload = JSON.parse(golden.vaults[0].encrypted) as Record<string, string>
+    mutate(payload)
+
+    await expect(CryptoUtil.decrypt(JSON.stringify(payload), golden.vaults[0].password))
+      .rejects.toBeInstanceOf(EncryptedPayloadCorruptionError)
+  })
+
+  it('continues accepting historic uppercase hexadecimal envelopes', async () => {
+    const payload = JSON.parse(golden.vaults[0].encrypted) as Record<string, string>
+    payload.iv = payload.iv.toUpperCase()
+    payload.salt = payload.salt.toUpperCase()
+    payload.data = payload.data.toUpperCase()
+
+    expect(await CryptoUtil.decrypt(JSON.stringify(payload), golden.vaults[0].password)).toBe(golden.vaults[0].mnemonic)
   })
 })

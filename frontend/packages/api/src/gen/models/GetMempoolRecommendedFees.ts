@@ -7,20 +7,6 @@ import type { MempoolRecommendedFeesDtoV1 } from './MempoolRecommendedFeesDtoV1'
 
 export type GetMempoolRecommendedFeesStatus200 = MempoolRecommendedFeesDtoV1;
 
-export type GetMempoolRecommendedFeesStatus400 = string;
-
-export type GetMempoolRecommendedFeesStatus401 = string;
-
-export type GetMempoolRecommendedFeesStatus404 = string;
-
-export type GetMempoolRecommendedFeesStatus409 = string;
-
-export type GetMempoolRecommendedFeesStatus413 = string;
-
-export type GetMempoolRecommendedFeesStatus500 = string;
-
-export type GetMempoolRecommendedFeesStatus504 = string;
-
 export type GetMempoolRecommendedFeesOptions = {
     body?: never;
     path?: never;
@@ -30,16 +16,9 @@ export type GetMempoolRecommendedFeesOptions = {
 
 export type GetMempoolRecommendedFeesResponses = {
     "200": GetMempoolRecommendedFeesStatus200;
-    "400": GetMempoolRecommendedFeesStatus400;
-    "401": GetMempoolRecommendedFeesStatus401;
-    "404": GetMempoolRecommendedFeesStatus404;
-    "409": GetMempoolRecommendedFeesStatus409;
-    "413": GetMempoolRecommendedFeesStatus413;
-    "500": GetMempoolRecommendedFeesStatus500;
-    "504": GetMempoolRecommendedFeesStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetMempoolRecommendedFeesResponse = (GetMempoolRecommendedFeesStatus200 | GetMempoolRecommendedFeesStatus400 | GetMempoolRecommendedFeesStatus401 | GetMempoolRecommendedFeesStatus404 | GetMempoolRecommendedFeesStatus409 | GetMempoolRecommendedFeesStatus413 | GetMempoolRecommendedFeesStatus500 | GetMempoolRecommendedFeesStatus504);
+export type GetMempoolRecommendedFeesResponse = GetMempoolRecommendedFeesStatus200;

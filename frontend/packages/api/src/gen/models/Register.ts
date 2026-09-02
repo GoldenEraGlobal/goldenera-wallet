@@ -8,20 +8,6 @@ import type { DeviceRegistrationRequestDtoV1 } from './DeviceRegistrationRequest
 
 export type RegisterStatus200 = DeviceDtoV1;
 
-export type RegisterStatus400 = string;
-
-export type RegisterStatus401 = string;
-
-export type RegisterStatus404 = string;
-
-export type RegisterStatus409 = string;
-
-export type RegisterStatus413 = string;
-
-export type RegisterStatus500 = string;
-
-export type RegisterStatus504 = string;
-
 export type RegisterBody = DeviceRegistrationRequestDtoV1;
 
 export type RegisterOptions = {
@@ -33,16 +19,9 @@ export type RegisterOptions = {
 
 export type RegisterResponses = {
     "200": RegisterStatus200;
-    "400": RegisterStatus400;
-    "401": RegisterStatus401;
-    "404": RegisterStatus404;
-    "409": RegisterStatus409;
-    "413": RegisterStatus413;
-    "500": RegisterStatus500;
-    "504": RegisterStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type RegisterResponse = (RegisterStatus200 | RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504);
+export type RegisterResponse = RegisterStatus200;

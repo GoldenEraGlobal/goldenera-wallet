@@ -23,8 +23,19 @@
  */
 package global.goldenera.wallet.api.core.v1.wallet.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 public record MempoolRecommendedFeesLevelDtoV1(
-        String baseFee,
-        String feePerByte,
-        String totalForAverageTx) {
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String baseFee,
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String feePerByte,
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String totalForAverageTx) {
 }

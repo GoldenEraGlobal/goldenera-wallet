@@ -27,25 +27,31 @@ import static lombok.AccessLevel.PRIVATE;
 
 import java.util.List;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
+import global.goldenera.wallet.filters.RequestBodyLimitFilter;
 import global.goldenera.wallet.filters.ThrottlingFilter;
+import global.goldenera.wallet.service.system.ApiErrorResponseWriter;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -84,21 +90,35 @@ public class SecurityConfig {
                         "payment=()",
                         "usb=()");
 
+        ApiErrorResponseWriter apiErrors;
+
         /**
          * Filter chain for the "master password" admin area.
          * This uses HTTP Basic Auth.
          */
         @Bean
         @Order(1)
-        public SecurityFilterChain adminApiFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain adminApiFilterChain(HttpSecurity http, ThrottlingFilter throttlingFilter)
+                        throws Exception {
                 http
                                 .securityMatcher("/api/admin/**")
                                 .cors(Customizer.withDefaults())
                                 .csrf(csrf -> csrf.disable())
                                 .formLogin(login -> login.disable())
-                                .httpBasic(Customizer.withDefaults())
+                                .httpBasic(basic -> basic.authenticationEntryPoint((request, response, exception) ->
+                                                apiErrors.write(response, HttpStatus.UNAUTHORIZED,
+                                                                "AUTHENTICATION_REQUIRED", "Authentication is required.")))
+                                .exceptionHandling(exceptions -> exceptions
+                                                .authenticationEntryPoint((request, response, exception) ->
+                                                                apiErrors.write(response, HttpStatus.UNAUTHORIZED,
+                                                                                "AUTHENTICATION_REQUIRED",
+                                                                                "Authentication is required."))
+                                                .accessDeniedHandler((request, response, exception) ->
+                                                                apiErrors.write(response, HttpStatus.FORBIDDEN,
+                                                                                "ACCESS_DENIED", "Access is denied.")))
                                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("ADMIN"));
+                                .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("ADMIN"))
+                                .addFilterAfter(throttlingFilter, CorsFilter.class);
                 return http.build();
         }
 
@@ -107,8 +127,8 @@ public class SecurityConfig {
          */
         @Bean
         @Order(2)
-        public SecurityFilterChain coreApiFilterChain(HttpSecurity http, ThrottlingFilter throttlingFilter)
-                        throws Exception {
+        public SecurityFilterChain coreApiFilterChain(HttpSecurity http, ThrottlingFilter throttlingFilter,
+                        RequestBodyLimitFilter requestBodyLimitFilter) throws Exception {
                 http
                                 .securityMatcher("/api/core/**")
                                 .cors(Customizer.withDefaults())
@@ -116,17 +136,25 @@ public class SecurityConfig {
                                                 .anyRequest().permitAll())
                                 .csrf(csrf -> csrf.disable())
                                 .formLogin(login -> login.disable())
-                                .httpBasic(basic -> basic.disable());
-
-                http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .addFilterBefore(throttlingFilter, UsernamePasswordAuthenticationFilter.class);
+                                .httpBasic(basic -> basic.disable())
+                                .exceptionHandling(exceptions -> exceptions
+                                                .authenticationEntryPoint((request, response, exception) ->
+                                                                apiErrors.write(response, HttpStatus.UNAUTHORIZED,
+                                                                                "AUTHENTICATION_REQUIRED",
+                                                                                "Authentication is required."))
+                                                .accessDeniedHandler((request, response, exception) ->
+                                                                apiErrors.write(response, HttpStatus.FORBIDDEN,
+                                                                                "ACCESS_DENIED", "Access is denied.")))
+                                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .addFilterAfter(throttlingFilter, CorsFilter.class)
+                                .addFilterAfter(requestBodyLimitFilter, ThrottlingFilter.class);
                 return http.build();
         }
 
         /** Public PWA/static resources with browser isolation headers. */
         @Bean
         @Order(3)
-        public SecurityFilterChain pwaFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain pwaFilterChain(HttpSecurity http, ThrottlingFilter throttlingFilter) throws Exception {
                 http
                                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                                 .csrf(csrf -> csrf.disable())
@@ -139,8 +167,30 @@ public class SecurityConfig {
                                                 .contentSecurityPolicy(csp -> csp.policyDirectives(PWA_CONTENT_SECURITY_POLICY))
                                                 .frameOptions(frame -> frame.deny())
                                                 .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
-                                                .permissionsPolicyHeader(policy -> policy.policy(PWA_PERMISSIONS_POLICY)));
+                                                .permissionsPolicyHeader(policy -> policy.policy(PWA_PERMISSIONS_POLICY)))
+                                .addFilterAfter(throttlingFilter, HeaderWriterFilter.class);
                 return http.build();
+        }
+
+        @Bean
+        WebSecurityCustomizer webSecurityCustomizer() {
+                return web -> web.requestRejectedHandler((request, response, exception) ->
+                                apiErrors.write(response, HttpStatus.BAD_REQUEST,
+                                                "REQUEST_REJECTED", "The request was rejected."));
+        }
+
+        @Bean
+        FilterRegistrationBean<ThrottlingFilter> throttlingFilterRegistration(ThrottlingFilter filter) {
+                FilterRegistrationBean<ThrottlingFilter> registration = new FilterRegistrationBean<>(filter);
+                registration.setEnabled(false);
+                return registration;
+        }
+
+        @Bean
+        FilterRegistrationBean<RequestBodyLimitFilter> requestBodyLimitFilterRegistration(RequestBodyLimitFilter filter) {
+                FilterRegistrationBean<RequestBodyLimitFilter> registration = new FilterRegistrationBean<>(filter);
+                registration.setEnabled(false);
+                return registration;
         }
 
         @Bean

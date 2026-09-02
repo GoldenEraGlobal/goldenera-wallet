@@ -15,20 +15,6 @@ export type GetTokenByAddressQuery = {
 
 export type GetTokenByAddressStatus200 = TokenDtoV1;
 
-export type GetTokenByAddressStatus400 = string;
-
-export type GetTokenByAddressStatus401 = string;
-
-export type GetTokenByAddressStatus404 = string;
-
-export type GetTokenByAddressStatus409 = string;
-
-export type GetTokenByAddressStatus413 = string;
-
-export type GetTokenByAddressStatus500 = string;
-
-export type GetTokenByAddressStatus504 = string;
-
 export type GetTokenByAddressOptions = {
     body?: never;
     path?: never;
@@ -38,16 +24,9 @@ export type GetTokenByAddressOptions = {
 
 export type GetTokenByAddressResponses = {
     "200": GetTokenByAddressStatus200;
-    "400": GetTokenByAddressStatus400;
-    "401": GetTokenByAddressStatus401;
-    "404": GetTokenByAddressStatus404;
-    "409": GetTokenByAddressStatus409;
-    "413": GetTokenByAddressStatus413;
-    "500": GetTokenByAddressStatus500;
-    "504": GetTokenByAddressStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetTokenByAddressResponse = (GetTokenByAddressStatus200 | GetTokenByAddressStatus400 | GetTokenByAddressStatus401 | GetTokenByAddressStatus404 | GetTokenByAddressStatus409 | GetTokenByAddressStatus413 | GetTokenByAddressStatus500 | GetTokenByAddressStatus504);
+export type GetTokenByAddressResponse = GetTokenByAddressStatus200;

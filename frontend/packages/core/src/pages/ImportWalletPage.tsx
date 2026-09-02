@@ -10,7 +10,7 @@ import {
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
 import { AlertCircle, ChevronLeft, Download, Fingerprint, KeyRound, ScanFace, Shield } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { BasicLayout } from '../layouts/Layouts'
@@ -55,7 +55,7 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
     const { pop } = useFlow()
     const importWallet = useWalletStore((state) => state.importWallet)
     const [step, setStep] = useState<Step>('mnemonic')
-    const [mnemonic, setMnemonic] = useState('')
+    const mnemonicRef = useRef('')
     const biometric = useWalletStore((state) => state.biometric)
     const [error, setError] = useState<string | null>(null)
 
@@ -77,8 +77,17 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
         mode: 'onChange',
     })
 
+    useEffect(() => {
+        return () => {
+            mnemonicRef.current = ''
+            mnemonicForm.unregister('mnemonic')
+            passwordForm.unregister(['password', 'confirmPassword'])
+        }
+    }, [mnemonicForm, passwordForm])
+
     const handleMnemonicSubmit = (data: MnemonicForm) => {
-        setMnemonic(data.mnemonic.trim().toLowerCase().replace(/\s+/g, ' '))
+        mnemonicRef.current = data.mnemonic.trim().toLowerCase().replace(/\s+/g, ' ')
+        mnemonicForm.reset({ mnemonic: '' })
         setStep('password')
         setError(null)
     }
@@ -86,7 +95,10 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
     const handleImport = async (data: PasswordForm) => {
         setError(null)
         try {
-            await importWallet(mnemonic, data.password, data.biometric)
+            await importWallet(mnemonicRef.current, data.password, data.biometric)
+            mnemonicRef.current = ''
+            mnemonicForm.reset({ mnemonic: '' })
+            passwordForm.reset()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to import wallet')
         }
@@ -95,8 +107,10 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
     const handleBack = () => {
         setError(null)
         if (step === 'password') {
-            setStep('mnemonic')
+            mnemonicRef.current = ''
+            mnemonicForm.reset({ mnemonic: '' })
             passwordForm.reset()
+            setStep('mnemonic')
         } else {
             pop()
         }
@@ -140,6 +154,10 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
                                 <Textarea
                                     id="mnemonic"
                                     placeholder="Enter your recovery phrase..."
+                                    autoComplete="off"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
                                     className="min-h-[120px] resize-none font-mono text-sm break-all"
                                     {...mnemonicForm.register('mnemonic')}
                                 />
@@ -228,10 +246,12 @@ export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () =>
                                 <Controller
                                     render={({ field }) => (
                                         <Switch
-                                            {...field as any}
                                             id="biometric"
                                             checked={field.value}
+                                            disabled={field.disabled}
+                                            onBlur={field.onBlur}
                                             onCheckedChange={field.onChange}
+                                            ref={field.ref}
                                         />
                                     )}
                                     name="biometric"

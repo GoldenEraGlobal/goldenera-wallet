@@ -30,11 +30,11 @@ export type UnifiedTransferDtoV1 = {
     amount?: string;
     fee?: string;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal transaction nonce
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    nonce?: bigint;
+    nonce?: string;
     message?: string;
     /**
      * @description
@@ -43,16 +43,16 @@ export type UnifiedTransferDtoV1 = {
     */
     timestamp?: string;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal block height
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    blockHeight?: bigint;
+    blockHeight?: string;
     blockHash?: string;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal confirmation count
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    confirmations?: bigint;
+    confirmations?: string;
 };

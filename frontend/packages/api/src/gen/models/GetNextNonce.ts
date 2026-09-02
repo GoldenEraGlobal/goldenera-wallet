@@ -11,21 +11,11 @@ export type GetNextNonceQuery = {
     address: string;
 };
 
+/**
+ * @pattern ^(0|[1-9][0-9]*)$
+ * @type string
+*/
 export type GetNextNonceStatus200 = string;
-
-export type GetNextNonceStatus400 = string;
-
-export type GetNextNonceStatus401 = string;
-
-export type GetNextNonceStatus404 = string;
-
-export type GetNextNonceStatus409 = string;
-
-export type GetNextNonceStatus413 = string;
-
-export type GetNextNonceStatus500 = string;
-
-export type GetNextNonceStatus504 = string;
 
 export type GetNextNonceOptions = {
     body?: never;
@@ -36,16 +26,9 @@ export type GetNextNonceOptions = {
 
 export type GetNextNonceResponses = {
     "200": GetNextNonceStatus200;
-    "400": GetNextNonceStatus400;
-    "401": GetNextNonceStatus401;
-    "404": GetNextNonceStatus404;
-    "409": GetNextNonceStatus409;
-    "413": GetNextNonceStatus413;
-    "500": GetNextNonceStatus500;
-    "504": GetNextNonceStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetNextNonceResponse = (GetNextNonceStatus200 | GetNextNonceStatus400 | GetNextNonceStatus401 | GetNextNonceStatus404 | GetNextNonceStatus409 | GetNextNonceStatus413 | GetNextNonceStatus500 | GetNextNonceStatus504);
+export type GetNextNonceResponse = GetNextNonceStatus200;

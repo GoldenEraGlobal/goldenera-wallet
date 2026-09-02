@@ -7,20 +7,6 @@ import type { TokenDtoV1 } from './TokenDtoV1'
 
 export type GetTokensStatus200 = TokenDtoV1[];
 
-export type GetTokensStatus400 = string;
-
-export type GetTokensStatus401 = string;
-
-export type GetTokensStatus404 = string;
-
-export type GetTokensStatus409 = string;
-
-export type GetTokensStatus413 = string;
-
-export type GetTokensStatus500 = string;
-
-export type GetTokensStatus504 = string;
-
 export type GetTokensOptions = {
     body?: never;
     path?: never;
@@ -30,16 +16,9 @@ export type GetTokensOptions = {
 
 export type GetTokensResponses = {
     "200": GetTokensStatus200;
-    "400": GetTokensStatus400;
-    "401": GetTokensStatus401;
-    "404": GetTokensStatus404;
-    "409": GetTokensStatus409;
-    "413": GetTokensStatus413;
-    "500": GetTokensStatus500;
-    "504": GetTokensStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetTokensResponse = (GetTokensStatus200 | GetTokensStatus400 | GetTokensStatus401 | GetTokensStatus404 | GetTokensStatus409 | GetTokensStatus413 | GetTokensStatus500 | GetTokensStatus504);
+export type GetTokensResponse = GetTokensStatus200;

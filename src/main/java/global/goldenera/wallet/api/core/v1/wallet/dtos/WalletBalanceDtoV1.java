@@ -40,19 +40,21 @@ public record WalletBalanceDtoV1(
                 Address tokenAddress,
                 /** Available amount after pending outgoing amounts and native fees. Used by Send/MAX. */
                 @Schema(description = "Available amount after pending outgoing amounts and native fees; used by Send/MAX") Wei balance,
-                /** Block height when balance was last updated */
-                Long updatedAtBlockHeight,
+                /** Canonical decimal block height when balance was last updated */
+                @Schema(description = "Canonical non-negative decimal block height", type = "string",
+                                pattern = "^(0|[1-9][0-9]*)$") String updatedAtBlockHeight,
                 /** Timestamp when balance was last updated */
                 Instant updatedAtTimestamp,
                 /** Full confirmed amount, including locked mining rewards. */
-                @Schema(description = "Full confirmed amount including locked mining rewards") Wei totalBalance,
+                @Schema(description = "Full confirmed amount including locked mining rewards",
+                                requiredMode = Schema.RequiredMode.REQUIRED) Wei totalBalance,
                 /** Confirmed mining rewards which cannot yet be spent. */
                 @Schema(description = "Confirmed mining rewards that cannot yet be spent") Wei lockedMiningReward,
                 /** Confirmed unlocked amount before pending outgoing reservations. */
                 @Schema(description = "Confirmed unlocked amount before pending outgoing reservations") Wei spendableBalance) {
 
         public WalletBalanceDtoV1(Address address, Address tokenAddress, Wei balance,
-                        Long updatedAtBlockHeight, Instant updatedAtTimestamp) {
+                        String updatedAtBlockHeight, Instant updatedAtTimestamp) {
                 this(address, tokenAddress, balance, updatedAtBlockHeight, updatedAtTimestamp,
                                 balance, Wei.ZERO, balance);
         }

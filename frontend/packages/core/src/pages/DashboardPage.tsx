@@ -11,16 +11,10 @@ import {
   Separator,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
-import {
-  ArrowUpRight,
-  CopyIcon,
-  Lock,
-  QrCode,
-  Settings
-} from 'lucide-react'
+import { ArrowUpRight, CopyIcon, Lock, QrCode, Settings } from 'lucide-react'
 import { TokenList } from '../components/TokenList'
 import { useBarcodeIsSupported } from '../hooks/useBarcodeIsSupported'
 import { useCopy } from '../hooks/useCopy'
@@ -29,7 +23,7 @@ import { useFlow } from '../router/useFlow'
 import { useWalletStore } from '../store/WalletStore'
 
 export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
-  const { copy, copied } = useCopy()
+  const { copy, copied, copyFailed } = useCopy()
   const { push } = useFlow()
   const address = useWalletStore((state) => state.address)
   const lockWallet = useWalletStore((state) => state.lockWallet)
@@ -37,8 +31,8 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
   const clearError = useWalletStore((state) => state.clearError)
   const supportedScan = useBarcodeIsSupported()
 
-  const handleLock = () => {
-    lockWallet()
+  const handleLock = async () => {
+    try { await lockWallet() } catch { /* The store reports a local-only lock warning. */ }
   }
 
   const copyAddress = async () => {
@@ -51,9 +45,6 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
     if (!addr) return ''
     return `${addr.slice(0, 8)}...${addr.slice(-6)}`
   }
-
-  // Calculate placeholder USD value
-  const totalUsdValue = '$0.00'
 
   return (
     <AppLayout
@@ -83,7 +74,9 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
           <Alert variant="destructive">
             <AlertDescription className="flex items-center justify-between gap-3">
               <span>{error}</span>
-              <Button type="button" variant="ghost" size="sm" onClick={clearError}>Dismiss</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearError}>
+                Dismiss
+              </Button>
             </AlertDescription>
           </Alert>
         )}
@@ -92,22 +85,28 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
           <CardContent className="text-center space-y-4 py-6">
             <div className="space-y-1">
               <p className="text-muted-foreground text-sm font-medium">Total Value</p>
-              <h2 className="text-2xl font-bold tracking-tight">
-                {totalUsdValue}
-                <span className="text-lg text-muted-foreground ml-2">USD</span>
+              {/* Balances do not include an authoritative USD price feed. */}
+              <h2 className="text-2xl font-bold tracking-tight text-muted-foreground">
+                Unavailable
               </h2>
+              <p className="text-sm text-muted-foreground" role="status">
+                USD valuation unavailable
+              </p>
             </div>
 
             <div className="flex items-center justify-center gap-2">
-              <Tooltip open={copied}>
-                <TooltipTrigger onClick={copyAddress} render={(props) => (
-                  <Badge className="font-mono" {...props}>
-                    {shortenAddress(address)}
-                    <CopyIcon />
-                  </Badge>
-                )} />
+              <Tooltip open={copied || copyFailed}>
+                <TooltipTrigger
+                  onClick={copyAddress}
+                  render={(props) => (
+                    <Badge className="font-mono" {...props}>
+                      {shortenAddress(address)}
+                      <CopyIcon />
+                    </Badge>
+                  )}
+                />
                 <TooltipContent>
-                  <p>{copied ? 'Copied!' : 'Copy'}</p>
+                  <p role="status">{copyFailed ? 'Copy failed' : copied ? 'Copied!' : 'Copy'}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -116,12 +115,21 @@ export const DashboardPage: ActivityComponentType<'DashboardPage'> = () => {
 
         {/* Action Buttons */}
         <div className="flex items-center w-full gap-3">
-          <Button size="lg" className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0" onClick={() => push('TxSubmitPage', {})}>
+          <Button
+            size="lg"
+            className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0"
+            onClick={() => push('TxSubmitPage', {})}
+          >
             <ArrowUpRight className="h-5 w-5" />
             <span className="text-xs">Send</span>
           </Button>
           {supportedScan && (
-            <Button size="lg" variant="outline" className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0" onClick={() => push('ScanQrCodePage', {})}>
+            <Button
+              size="lg"
+              variant="outline"
+              className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0"
+              onClick={() => push('ScanQrCodePage', {})}
+            >
               <QrCode className="h-5 w-5" />
               <span className="text-xs">Scan</span>
             </Button>

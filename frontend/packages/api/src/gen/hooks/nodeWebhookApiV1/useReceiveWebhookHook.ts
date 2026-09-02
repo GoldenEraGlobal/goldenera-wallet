@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { ReceiveWebhookOptions, ReceiveWebhookStatus200, ReceiveWebhookStatus400, ReceiveWebhookStatus401, ReceiveWebhookStatus404, ReceiveWebhookStatus409, ReceiveWebhookStatus413, ReceiveWebhookStatus500, ReceiveWebhookStatus504 } from '../../models/ReceiveWebhook'
+import type { ReceiveWebhookOptions, ReceiveWebhookStatus200 } from '../../models/ReceiveWebhook'
 import type { UseMutationOptions, UseMutationResult, QueryClient } from '@tanstack/react-query'
 import { receiveWebhook } from '../../clients/receiveWebhook'
 import { mutationOptions, useMutation } from '@tanstack/react-query'
@@ -13,7 +13,7 @@ export const receiveWebhookMutationKey = () => [{ url: '/api/core/v1/node-webhoo
 
 export function receiveWebhookMutationOptions<TContext = unknown>(config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const mutationKey = receiveWebhookMutationKey()
-  return mutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504>, ReceiveWebhookOptions, TContext>({
+  return mutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<Error>, ReceiveWebhookOptions, TContext>({
     mutationKey,
     mutationFn: async({ body, headers }) => {
       const { data } = await receiveWebhook({ ...config, body, headers, throwOnError: true })
@@ -26,18 +26,18 @@ export function receiveWebhookMutationOptions<TContext = unknown>(config: Partia
  * {@link /api/core/v1/node-webhook/handle}
  */
 export function useReceiveWebhookHook<TContext>(options: {
-  mutation?: UseMutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504>, ReceiveWebhookOptions, TContext> & { client?: QueryClient },
+  mutation?: UseMutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<Error>, ReceiveWebhookOptions, TContext> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>,
 } = {}) {
   const { mutation = {}, client: config = {} } = options ?? {}
   const { client: queryClient, ...mutationOptions } = mutation;
   const mutationKey = mutationOptions.mutationKey ?? receiveWebhookMutationKey()
 
-  const baseOptions = receiveWebhookMutationOptions(config) as UseMutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504>, ReceiveWebhookOptions, TContext>
+  const baseOptions = receiveWebhookMutationOptions(config) as UseMutationOptions<ReceiveWebhookStatus200, ResponseErrorConfig<Error>, ReceiveWebhookOptions, TContext>
 
-  return useMutation<ReceiveWebhookStatus200, ResponseErrorConfig<ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504>, ReceiveWebhookOptions, TContext>({
+  return useMutation<ReceiveWebhookStatus200, ResponseErrorConfig<Error>, ReceiveWebhookOptions, TContext>({
     ...baseOptions,
     mutationKey,
     ...mutationOptions,
-  }, queryClient) as UseMutationResult<ReceiveWebhookStatus200, ResponseErrorConfig<ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504>, ReceiveWebhookOptions, TContext>
+  }, queryClient) as UseMutationResult<ReceiveWebhookStatus200, ResponseErrorConfig<Error>, ReceiveWebhookOptions, TContext>
 }

@@ -21,17 +21,22 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -71,6 +76,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.github.benmanes.caffeine.cache.Cache;
 import com.sun.net.httpserver.HttpServer;
 
 import global.goldenera.cryptoj.datatypes.Address;
@@ -117,6 +123,10 @@ import tools.jackson.databind.json.JsonMapper;
         "ge.throttling.global-refill-tokens=10000",
         "ge.throttling.public-core-capacity=10000",
         "ge.throttling.public-core-refill-tokens=10000",
+        "ge.device-registration.mutations-enabled=false",
+        "ge.device-cleanup.enabled=true",
+        "ge.device-cleanup.batch-size=1",
+        "ge.device-cleanup.max-batches-per-run=100",
         "server.address=127.0.0.1",
         "ge.node.connect-timeout=100ms",
         "ge.node.read-timeout=250ms"
@@ -156,11 +166,20 @@ class BackendCompatibilityTest {
     @Autowired DataSource dataSource;
     @Autowired SubscriptionCleanupService cleanup;
     @Autowired ThrottlingService throttlingService;
+    @Autowired WalletBusinessService walletBusinessService;
     @LocalServerPort int port;
 
     @BeforeEach
     void resetNode() {
         NODE.reset();
+        invalidateHistorySnapshots();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void invalidateHistorySnapshots() {
+        Cache<?, ?> snapshots = (Cache<?, ?>) ReflectionTestUtils.getField(
+                walletBusinessService, "historySnapshots");
+        snapshots.invalidateAll();
     }
 
     @AfterAll
@@ -172,7 +191,7 @@ class BackendCompatibilityTest {
     void migrationsRunOnPostgresqlAndCanRunAgain() throws Exception {
         assertThat(jdbc.queryForObject("select version()", String.class)).startsWith("PostgreSQL 18.6");
         int applied = jdbc.queryForObject("select count(*) from databasechangelog", Integer.class);
-        assertThat(applied).isEqualTo(31);
+        assertThat(applied).isEqualTo(33);
         assertThat(jdbc.queryForObject("show data_directory", String.class)).startsWith("/var/lib/postgresql/18/");
         liquibase.afterPropertiesSet();
         assertThat(jdbc.queryForObject("select count(*) from databasechangelog", Integer.class)).isEqualTo(applied);
@@ -193,26 +212,60 @@ class BackendCompatibilityTest {
     }
 
     @Test
-    void deviceRegistrationUsesPostgresqlUpsertWithoutChangingDeviceId() throws Exception {
-        String clientId = UUID.randomUUID().toString();
-        String first = mvc.perform(post("/api/core/v1/device/register").contentType(MediaType.APPLICATION_JSON)
+    void trackedAddressOrphanLookupIndexIsInstalledConcurrentlyAndValid() {
+        String indexDefinition = jdbc.queryForObject("""
+                select indexdef
+                from pg_indexes
+                where schemaname = current_schema()
+                  and indexname = 'idx_user_account_tracked_address_id'
+                """, String.class);
+
+        assertThat(indexDefinition).contains("USING btree (tracked_address_id)");
+        assertThat(trackedAddressIndexIsValid("public")).isTrue();
+    }
+
+    @Test
+    void trackedAddressIndexMigrationRebuildsAnInvalidSameNamedIndexOnRetry() throws Exception {
+        String schema = "tracked_address_index_retry";
+        jdbc.execute("create schema " + schema);
+        jdbc.execute("create table " + schema + ".user_account (id bigint not null, tracked_address_id bigint)");
+        jdbc.execute("insert into " + schema + ".user_account values (1, 7), (2, 7)");
+
+        assertThatThrownBy(() -> jdbc.execute("create unique index concurrently "
+                + "idx_user_account_tracked_address_id on " + schema + ".user_account (tracked_address_id)"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(trackedAddressIndexIsValid(schema)).isFalse();
+
+        migration(schema, "classpath:db/changelog/changesets/003-user-account-tracked-address-index.yaml")
+                .afterPropertiesSet();
+
+        assertThat(trackedAddressIndexIsValid(schema)).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from " + schema + ".databasechangelog", Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void deviceRegistrationCompatibilityEndpointReturnsLegacySuccessWithoutMutatingRows() throws Exception {
+        UUID clientId = UUID.randomUUID();
+        long rowCount = devices.count();
+        String response = mvc.perform(post("/api/core/v1/device/register").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientIdentifier\":\"" + clientId + "\",\"platform\":\"PWA\",\"appVersion\":\"1\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        String updated = mvc.perform(post("/api/core/v1/device/register").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"clientIdentifier\":\"" + clientId + "\",\"platform\":\"PWA\",\"appVersion\":\"2\"}"))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertThat(mapper.readTree(updated).get("id")).isEqualTo(mapper.readTree(first).get("id"));
-        assertThat(mapper.readTree(updated).get("appVersion").asString()).isEqualTo("2");
-        assertThat(devices.findByClientIdentifier(UUID.fromString(clientId))).isPresent();
+        assertThat(mapper.readTree(response).get("clientIdentifier").asString()).isEqualTo(clientId.toString());
+        assertThat(mapper.readTree(response).get("platform").asString()).isEqualTo("PWA");
+        assertThat(mapper.readTree(response).get("appVersion").asString()).isEqualTo("1");
+        assertThat(devices.count()).isEqualTo(rowCount);
+        assertThat(devices.findByClientIdentifier(clientId)).isEmpty();
     }
 
     @Test
     void jsonPreservesDecimalStringsChecksumAddressesAndIsoInstants() {
         WalletBalanceDtoV1 balance = new WalletBalanceDtoV1(Address.fromHexString(ADDRESS), Address.ZERO,
-                Wei.valueOf(new BigInteger("123456789012345678901234567890")), 42L, Instant.parse("2026-08-31T12:34:56Z"));
+                Wei.valueOf(new BigInteger("123456789012345678901234567890")), "9007199254740993",
+                Instant.parse("2026-08-31T12:34:56Z"));
         String json = mapper.writeValueAsString(balance);
         assertThat(json).isEqualTo("{\"address\":\"" + ADDRESS + "\",\"tokenAddress\":\"" + ZERO
-                + "\",\"balance\":\"123456789012345678901234567890\",\"updatedAtBlockHeight\":42,"
+                + "\",\"balance\":\"123456789012345678901234567890\",\"updatedAtBlockHeight\":\"9007199254740993\","
                 + "\"updatedAtTimestamp\":\"2026-08-31T12:34:56Z\",\"totalBalance\":\"123456789012345678901234567890\","
                 + "\"lockedMiningReward\":\"0\",\"spendableBalance\":\"123456789012345678901234567890\"}");
         assertThat(mapper.readValue(json, WalletBalanceDtoV1.class)).isEqualTo(balance);
@@ -286,16 +339,30 @@ class BackendCompatibilityTest {
     @Test
     void requestBodyFilterRejectsDeclaredAndChunkedOverrunsBeforeControllerOrNode() throws Exception {
         byte[] declared = new byte[RequestBodyLimitFilter.SIGNED_TX_REQUEST_BYTES + 1];
-        mvc.perform(post("/api/core/v1/wallet/submit-tx").contentType(MediaType.APPLICATION_JSON).content(declared))
-                .andExpect(status().isPayloadTooLarge());
+        String declaredError = mvc.perform(post("/api/core/v1/wallet/submit-tx")
+                .contentType(MediaType.APPLICATION_JSON).content(declared))
+                .andExpect(status().isPayloadTooLarge()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(declaredError).get("code").asString()).isEqualTo("PAYLOAD_TOO_LARGE");
 
-        byte[] chunked = new byte[RequestBodyLimitFilter.SIGNED_TX_REQUEST_BYTES + 1];
+        byte[] chunked = ("{\"hexData\":\"0x00\"}" + " ".repeat(RequestBodyLimitFilter.SIGNED_TX_REQUEST_BYTES))
+                .getBytes(StandardCharsets.UTF_8);
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/core/v1/wallet/submit-tx"))
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(chunked)))
                 .build();
         HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
-        assertThat(response.statusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(response.statusCode()).as(response.body()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
+        assertThat(mapper.readTree(response.body()).get("code").asString()).isEqualTo("PAYLOAD_TOO_LARGE");
+
+        HttpRequest unexpectedGetBody = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port
+                + "/api/core/v1/wallet/balances?addresses=" + ADDRESS))
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .method("GET", HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(new byte[] { 1 })))
+                .build();
+        HttpResponse<String> unexpectedGetBodyResponse = HttpClient.newHttpClient()
+                .send(unexpectedGetBody, HttpResponse.BodyHandlers.ofString());
+        assertThat(unexpectedGetBodyResponse.statusCode()).as(unexpectedGetBodyResponse.body())
+                .isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
 
         byte[] oversizedWebhook = new byte[RequestBodyLimitFilter.WEBHOOK_REQUEST_BYTES + 1];
         HttpRequest webhookRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + WEBHOOK_PATH))
@@ -308,6 +375,21 @@ class BackendCompatibilityTest {
                 .send(webhookRequest, HttpResponse.BodyHandlers.ofString());
         assertThat(webhookResponse.statusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE.value());
         assertThat(NODE.requests.stream().filter(nodeRequest -> nodeRequest.path().equals(SUBMIT_PATH))).isEmpty();
+    }
+
+    @Test
+    void unknownCoreRoutesAndWrongMethodsAreRejectedBeforeBodyHandling() throws Exception {
+        String missing = mvc.perform(post("/api/core/v1/wallet/not-a-route")
+                .contentType(MediaType.APPLICATION_JSON).content(new byte[1024]))
+                .andExpect(status().isNotFound()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(missing).get("code").asString()).isEqualTo("ROUTE_NOT_FOUND");
+
+        String wrongMethod = mvc.perform(post("/api/core/v1/wallet/balances")
+                .contentType(MediaType.APPLICATION_JSON).content(new byte[1024]))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", containsString("GET")))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(wrongMethod).get("code").asString()).isEqualTo("METHOD_NOT_ALLOWED");
     }
 
     @Test
@@ -324,7 +406,9 @@ class BackendCompatibilityTest {
                 MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
                 assertThat(throttlingService.checkSpecificLimit(request, key)).isTrue();
                 assertThat(bucket.getAvailableTokens()).isZero();
-                assertThat(throttlingService.checkSpecificLimit(request, key)).isFalse();
+                var rejected = throttlingService.checkSpecificLimitDecision(request, key);
+                assertThat(rejected.allowed()).isFalse();
+                assertThat(rejected.retryAfterSeconds()).isGreaterThan(1);
             }
         } finally {
             buckets.clear();
@@ -335,10 +419,11 @@ class BackendCompatibilityTest {
     void nodeHttpErrorRemainsSanitizedAndIsNotRetriedAsConnectionFailure() throws Exception {
         String signed = resourceJson("/contracts/signed-transfers.json").get("transfers").get(0).get("hex").asString();
         NODE.respond(SUBMIT_PATH, 503, "{\"message\":\"internal mock detail\"}");
-        mvc.perform(post("/api/core/v1/wallet/submit-tx").contentType(MediaType.APPLICATION_JSON)
+        String error = mvc.perform(post("/api/core/v1/wallet/submit-tx").contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("hexData", signed))))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().string("{\"message\":\"Unexpected unrecognised internal server exception.\"}"));
+                .andExpect(status().isInternalServerError()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(error).get("code").asString()).isEqualTo("INTERNAL_ERROR");
+        assertThat(error).doesNotContain("internal mock detail");
         assertThat(NODE.requests.stream().filter(r -> r.path().equals(SUBMIT_PATH))).hasSize(1);
     }
 
@@ -357,22 +442,91 @@ class BackendCompatibilityTest {
         mvc.perform(post(WEBHOOK_PATH).contentType(MediaType.APPLICATION_JSON).content(body)
                 .header("X-Webhook-Timestamp", expired).header("X-Webhook-Signature", sign(body, expired)))
                 .andExpect(status().isUnauthorized());
+        for (String extreme : List.of(Long.toString(Long.MIN_VALUE), Long.toString(Long.MAX_VALUE))) {
+            mvc.perform(post(WEBHOOK_PATH).contentType(MediaType.APPLICATION_JSON).content(body)
+                    .header("X-Webhook-Timestamp", extreme).header("X-Webhook-Signature", sign(body, extreme)))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
     @Test
     void signedInvalidJsonHasTheExistingBadRequestContract() throws Exception {
         String timestamp = Long.toString(Instant.now().getEpochSecond());
-        mvc.perform(post(WEBHOOK_PATH).contentType(MediaType.APPLICATION_JSON).content("invalid")
-                .header("X-Webhook-Timestamp", timestamp).header("X-Webhook-Signature", sign("invalid", timestamp)))
-                .andExpect(status().isBadRequest()).andExpect(content().string("Invalid JSON structure"));
+        for (String invalid : List.of("invalid", "null", "[null]",
+                "[{\"type\":\"NEW_BLOCK\",\"source\":\"BLOCKCHAIN\"}]")) {
+            String error = mvc.perform(post(WEBHOOK_PATH).contentType(MediaType.APPLICATION_JSON).content(invalid)
+                    .header("X-Webhook-Timestamp", timestamp)
+                    .header("X-Webhook-Signature", sign(invalid, timestamp)))
+                    .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+            assertThat(mapper.readTree(error).get("code").asString()).isEqualTo("MALFORMED_REQUEST");
+        }
+
+        String missingHeader = mvc.perform(post(WEBHOOK_PATH).contentType(MediaType.APPLICATION_JSON).content("[]"))
+                .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(missingHeader).get("code").asString()).isEqualTo("MISSING_HEADER");
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void publicCorsAndProtectedAdminBoundarySurviveSecurityMigration() throws Exception {
-        mvc.perform(get("/api/admin/review-probe")).andExpect(status().isUnauthorized());
-        mvc.perform(options("/api/core/v1/wallet/submit-tx").header("Origin", "https://wallet.example")
+        String origin = "https://wallet.example";
+        String adminError = mvc.perform(get("/api/admin/review-probe").header("Origin", origin))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(adminError).get("code").asString()).isEqualTo("AUTHENTICATION_REQUIRED");
+        String rejected = mvc.perform(get("/api/review/client-ip;matrix"))
+                .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(rejected).get("code").asString()).isEqualTo("REQUEST_REJECTED");
+
+        mvc.perform(options("/api/core/v1/wallet/submit-tx").header("Origin", origin)
                 .header("Access-Control-Request-Method", "POST"))
-                .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", "https://wallet.example"));
+                .andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin", origin));
+        mvc.perform(get("/api/core/v1/not-a-route").header("Origin", origin))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+        mvc.perform(post("/api/core/v1/wallet/balances").header("Origin", origin))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin));
+        mvc.perform(post("/api/core/v1/wallet/submit-tx").header("Origin", origin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new byte[RequestBodyLimitFilter.SIGNED_TX_REQUEST_BYTES + 1]))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin));
+
+        Map<String, Bucket> buckets = (Map<String, Bucket>) ReflectionTestUtils.getField(
+                throttlingService, "specificLogicCache");
+        String bucketKey = "127.0.0.1:PUBLIC_CORE";
+        Bucket exhausted = Bucket.builder().addLimit(limit -> limit.capacity(1)
+                .refillGreedy(1, Duration.ofDays(1))).build();
+        assertThat(exhausted.tryConsume(1)).isTrue();
+        buckets.put(bucketKey, exhausted);
+        try {
+            mvc.perform(get("/api/core/v1/not-a-route").header("Origin", origin))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().string("Access-Control-Allow-Origin", origin))
+                    .andExpect(header().exists("Retry-After"));
+        } finally {
+            buckets.remove(bucketKey, exhausted);
+        }
+
+        MockHttpServletRequest admissionRequest = new MockHttpServletRequest(
+                "GET", "/api/core/v1/wallet/balances");
+        admissionRequest.setRemoteAddr("127.0.0.1");
+        List<ThrottlingService.InFlightAdmission> admissions = new ArrayList<>();
+        try {
+            ThrottlingService.InFlightAdmission admission;
+            while ((admission = throttlingService.tryAcquireInFlight(admissionRequest, 0)) != null) {
+                admissions.add(admission);
+            }
+            assertThat(admissions).isNotEmpty();
+            mvc.perform(get("/api/core/v1/wallet/balances").param("addresses", ADDRESS).header("Origin", origin))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(header().string("Access-Control-Allow-Origin", origin));
+        } finally {
+            admissions.forEach(ThrottlingService.InFlightAdmission::close);
+        }
     }
 
     @Test
@@ -402,13 +556,42 @@ class BackendCompatibilityTest {
         String response = mvc.perform(get("/v3/api-docs/Core API")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode current = mapper.readTree(response);
-        assertThat(current.get("paths").propertyNames()).containsExactlyInAnyOrderElementsOf(baseline.get("paths").propertyNames());
-        for (String path : baseline.get("paths").propertyNames()) {
+        var baselinePaths = baseline.get("paths").propertyNames();
+        var currentPaths = current.get("paths").propertyNames();
+        String transactionStatusPath = "/api/core/v1/wallet/transaction-status";
+        assertThat(currentPaths).containsAll(baselinePaths).contains(transactionStatusPath)
+                .hasSize(baselinePaths.size() + 1);
+        for (String path : baselinePaths) {
             for (String method : baseline.get("paths").get(path).propertyNames()) {
                 assertThat(current.get("paths").get(path).get(method).get("operationId"))
                         .isEqualTo(baseline.get("paths").get(path).get(method).get("operationId"));
             }
         }
+        JsonNode transactionStatusOperation = current.get("paths").get(transactionStatusPath).get("get");
+        assertThat(transactionStatusOperation.get("operationId").asString()).isEqualTo("getTransactionStatus");
+        Map<String, JsonNode> parameterSchemas = new HashMap<>();
+        for (JsonNode parameter : transactionStatusOperation.get("parameters")) {
+            assertThat(parameter.get("required").asBoolean()).isTrue();
+            parameterSchemas.put(parameter.get("name").asString(), parameter.get("schema"));
+        }
+        assertThat(parameterSchemas).containsOnlyKeys("hash", "sender", "nonce");
+        assertThat(parameterSchemas.get("hash").get("pattern").asString()).isEqualTo("^0x[0-9a-f]{64}$");
+        assertThat(parameterSchemas.get("sender").get("pattern").asString()).isEqualTo("^0x[0-9a-fA-F]{40}$");
+        assertThat(parameterSchemas.get("nonce").get("pattern").asString()).isEqualTo("^(0|[1-9][0-9]*)$");
+
+        JsonNode transactionStatusSchema = current.get("components").get("schemas").get("TransactionStatusDtoV1");
+        List<String> requiredProperties = new ArrayList<>();
+        for (JsonNode property : transactionStatusSchema.get("required")) {
+            requiredProperties.add(property.asString());
+        }
+        assertThat(requiredProperties).containsExactlyInAnyOrder(
+                "status", "hash", "sender", "nonce", "nextNonce", "confirmations", "requiredConfirmations");
+        assertThat(transactionStatusSchema.get("properties").get("hash").get("pattern").asString())
+                .isEqualTo("^0x[0-9a-f]{64}$");
+        assertThat(transactionStatusSchema.get("properties").get("sender").get("pattern").asString())
+                .isEqualTo("^0x[0-9a-f]{40}$");
+        assertThat(transactionStatusSchema.get("properties").get("nonce").get("pattern").asString())
+                .isEqualTo("^(0|[1-9][0-9]*)$");
         Files.writeString(Path.of("target/wallet-openapi-boot4.json"), response);
     }
 
@@ -475,19 +658,28 @@ class BackendCompatibilityTest {
         NODE.reset();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int i = 0; i < 2000; i++) {
-            rows.add(Map.of("version", "V1", "address", ADDRESS, "tokenAddress", ZERO, "balance", "1"));
+            rows.add(Map.of(
+                    "version", "V1",
+                    "address", ADDRESS,
+                    "tokenAddress", "0x" + String.format("%040x", i + 1),
+                    "balance", "1"));
         }
         NODE.page(BALANCE_PATH, rows);
-        mvc.perform(get("/api/core/v1/wallet/balances").param("addresses", ADDRESS)).andExpect(status().isBadRequest());
-        assertThat(NODE.requests.stream().filter(r -> r.path().equals(BALANCE_PATH))).hasSize(20);
-        assertThat(NODE.requests.stream().filter(r -> r.path().equals(PENDING_PATH))).isEmpty();
+        NODE.page(PENDING_PATH, List.of());
+        mvc.perform(get("/api/core/v1/wallet/balances").param("addresses", ADDRESS)).andExpect(status().isOk());
+        assertThat(NODE.requests.stream().filter(r -> r.path().equals(BALANCE_PATH))).hasSize(40);
+        assertThat(NODE.requests.stream().filter(r -> r.path().equals(PENDING_PATH))).hasSize(2);
     }
 
     @Test
     void nonEmptyTruncatedBalancePagesFailClosed() throws Exception {
         List<Map<String, Object>> balances = new ArrayList<>();
         for (int i = 0; i < 50; i++) {
-            balances.add(Map.of("version", "V1", "address", ADDRESS, "tokenAddress", ZERO, "balance", "1000"));
+            balances.add(Map.of(
+                    "version", "V1",
+                    "address", ADDRESS,
+                    "tokenAddress", "0x" + String.format("%040x", i + 1),
+                    "balance", "1000"));
         }
         NODE.respond(BALANCE_PATH, 200, mapper.writeValueAsString(
                 Map.of("list", balances, "totalElements", 100, "totalPages", 1)));
@@ -500,7 +692,7 @@ class BackendCompatibilityTest {
         NODE.reset();
         NODE.page(BALANCE_PATH, balances);
         NODE.page(PENDING_PATH, List.of());
-        assertThat(balanceRequest(ZERO).size()).isEqualTo(50);
+        assertThat(balanceRequest(null).size()).isEqualTo(50);
     }
 
     @Test
@@ -560,11 +752,24 @@ class BackendCompatibilityTest {
         String confirmedPath = "/api/explorer/v1/transfer/page/bulk";
         NODE.respond("/api/core/v1/blockchain/latest-height", 200, "100");
         for (int pendingCount : List.of(0, 1, 3, 19, 20, 23, 40)) {
+            invalidateHistorySnapshots();
             List<Map<String, Object>> pending = new ArrayList<>();
             List<Map<String, Object>> confirmed = new ArrayList<>();
             List<Long> expected = new ArrayList<>();
-            for (int i = 0; i < pendingCount; i++) { pending.add(Map.of("nonce", 1000 + i)); expected.add(1000L + i); }
-            for (int i = 0; i < 47; i++) { confirmed.add(Map.of("nonce", i)); expected.add((long) i); }
+            for (int i = 0; i < pendingCount; i++) {
+                Map<String, Object> row = new HashMap<>(pending(
+                        "0x" + String.format("%064x", 1_000 + i), ZERO, "1", "1"));
+                row.put("nonce", 1_000 + i);
+                pending.add(row);
+                expected.add(1_000L + i);
+            }
+            for (int i = 0; i < 47; i++) {
+                confirmed.add(confirmed(
+                        "0x" + String.format("%064x", i),
+                        i,
+                        i + 1));
+                expected.add((long) i);
+            }
             NODE.page(PENDING_PATH, pending);
             NODE.page(confirmedPath, confirmed);
             List<Long> actual = new ArrayList<>();
@@ -574,7 +779,8 @@ class BackendCompatibilityTest {
                         .param("pageNumber", Integer.toString(number)).param("pageSize", "20"))
                         .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
                 JsonNode page = mapper.readTree(json);
-                assertThat(page.get("totalElements").asLong()).isEqualTo(pendingCount + 47);
+                assertThat(page.get("totalElements").isTextual()).isTrue();
+                assertThat(page.get("totalElements").textValue()).isEqualTo(Long.toString(pendingCount + 47));
                 assertThat(page.get("last").asBoolean()).isEqualTo(number == pages - 1);
                 for (JsonNode row : page.get("content")) actual.add(row.get("nonce").asLong());
             }
@@ -587,7 +793,7 @@ class BackendCompatibilityTest {
     void nativeTomcatIgnoresForgedForwardedAddressesWithoutAnExplicitTrustedProxy() throws Exception {
         try (HttpClient client = HttpClient.newHttpClient()) {
             for (String forged : List.of("203.0.113.10", "198.51.100.20")) {
-                HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/core/v1/review/client-ip"))
+                HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/review/client-ip"))
                         .header("X-Forwarded-For", forged).header("X-Forwarded-Proto", "https").GET().build();
                 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
                 assertThat(response.statusCode()).isEqualTo(200);
@@ -597,14 +803,17 @@ class BackendCompatibilityTest {
     }
 
     @Test
-    void stalledNodeHeadersHitTheDeadlineAndReadRetryBudget() throws Exception {
+    void stalledNodeHeadersHitTheDeadlineWithoutMultiplyingObservationAttempts() throws Exception {
         String path = "/api/core/v1/blockchain/latest-height";
+        NODE.page(PENDING_PATH, List.of());
+        NODE.page("/api/explorer/v1/transfer/page/bulk", List.of(
+                confirmed("0x" + "11".repeat(32), 1, 1)));
         NODE.delay(path, 1500, 0, "100");
         long started = System.nanoTime();
         mvc.perform(get("/api/core/v1/wallet/transfers").param("addresses", ADDRESS))
                 .andExpect(status().isGatewayTimeout());
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5));
-        assertThat(NODE.requests.stream().filter(r -> r.path().equals(path))).hasSize(3);
+        assertThat(NODE.requests.stream().filter(r -> r.path().equals(path))).hasSize(1);
     }
 
     @Test
@@ -612,9 +821,12 @@ class BackendCompatibilityTest {
         String signed = resourceJson("/contracts/signed-transfers.json").get("transfers").get(0).get("hex").asString();
         NODE.delay(SUBMIT_PATH, 0, 1500, "{\"status\":\"SUCCESS\"}");
         long started = System.nanoTime();
-        mvc.perform(post("/api/core/v1/wallet/submit-tx").contentType(MediaType.APPLICATION_JSON)
+        String timeout = mvc.perform(post("/api/core/v1/wallet/submit-tx").contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(Map.of("hexData", signed))))
-                .andExpect(status().isGatewayTimeout()).andExpect(content().string(containsString("may already have been accepted")));
+                .andExpect(status().isGatewayTimeout()).andReturn().getResponse().getContentAsString();
+        assertThat(mapper.readTree(timeout).get("code").asString()).isEqualTo("NODE_TIMEOUT");
+        assertThat(mapper.readTree(timeout).get("message").asString())
+                .isEqualTo("The upstream node did not respond. Retry the request.");
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(1));
         assertThat(NODE.requests.stream().filter(r -> r.path().equals(SUBMIT_PATH))).hasSize(1);
     }
@@ -642,28 +854,92 @@ class BackendCompatibilityTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         migration("legacy_upgrade", "classpath:db/changelog/db.changelog-master.yaml").afterPropertiesSet();
         assertThat(jdbc.queryForObject("select count(*) from legacy_upgrade.user_account", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("select count(*) from legacy_upgrade.databasechangelog", Integer.class)).isEqualTo(31);
+        assertThat(jdbc.queryForObject("select count(*) from legacy_upgrade.databasechangelog", Integer.class)).isEqualTo(33);
         jdbc.update("delete from legacy_upgrade.device where id=?", id);
         assertThat(jdbc.queryForObject("select count(*) from legacy_upgrade.user_account", Integer.class)).isZero();
     }
 
     @Test
-    void cleanupDeletesZombieAccountsAndOnlyTheirOrphanAddresses() {
-        UUID zombie = UUID.randomUUID();
+    void cleanupDeletesKnownOldDevicesButPreservesUnknownLastSeenRows() {
+        UUID oldZombie = UUID.randomUUID();
+        UUID nullSeenZombie = UUID.randomUUID();
         UUID active = UUID.randomUUID();
-        jdbc.update("insert into device(id,client_identifier,created_at,last_seen_at) values (?,?,now(),now()-interval '181 days')", zombie, zombie);
+        jdbc.update("insert into device(id,client_identifier,created_at,last_seen_at) values (?,?,now(),now()-interval '181 days')", oldZombie, oldZombie);
+        jdbc.update("insert into device(id,client_identifier,created_at,last_seen_at) values (?,?,now(),null)", nullSeenZombie, nullSeenZombie);
         jdbc.update("insert into device(id,client_identifier,created_at,last_seen_at) values (?,?,now(),now())", active, active);
         Long shared = jdbc.queryForObject("insert into tracked_address(id,address) values(nextval('tracked_addr_id_seq'),decode('" + "44".repeat(20) + "','hex')) returning id", Long.class);
-        Long orphan = jdbc.queryForObject("insert into tracked_address(id,address) values(nextval('tracked_addr_id_seq'),decode('" + "55".repeat(20) + "','hex')) returning id", Long.class);
-        insertAccount(zombie, shared);
+        Long oldOrphan = jdbc.queryForObject("insert into tracked_address(id,address) values(nextval('tracked_addr_id_seq'),decode('" + "55".repeat(20) + "','hex')) returning id", Long.class);
+        Long nullSeenOrphan = jdbc.queryForObject("insert into tracked_address(id,address) values(nextval('tracked_addr_id_seq'),decode('" + "66".repeat(20) + "','hex')) returning id", Long.class);
+        insertAccount(oldZombie, shared);
         insertAccount(active, shared);
-        insertAccount(zombie, orphan);
+        insertAccount(oldZombie, oldOrphan);
+        insertAccount(nullSeenZombie, nullSeenOrphan);
+
         cleanup.cleanupZombies();
-        assertThat(devices.findById(zombie)).isEmpty();
+
+        assertThat(devices.findById(oldZombie)).isEmpty();
+        assertThat(devices.findById(nullSeenZombie)).isPresent();
         assertThat(devices.findById(active)).isPresent();
         assertThat(trackedAddresses.findById(shared)).isPresent();
-        assertThat(trackedAddresses.findById(orphan)).isEmpty();
+        assertThat(trackedAddresses.findById(oldOrphan)).isEmpty();
+        assertThat(trackedAddresses.findById(nullSeenOrphan)).isPresent();
         assertThat(userAccounts.countByTrackedAddressId(shared)).isEqualTo(1);
+        assertThat(userAccounts.countByTrackedAddressId(nullSeenOrphan)).isEqualTo(1);
+    }
+
+    @Test
+    void lockedCleanupCandidateRejectsALateAccountInsertInsteadOfCreatingAnOrphanRace() throws Exception {
+        UUID staleDevice = UUID.randomUUID();
+        jdbc.update("insert into device(id,client_identifier,created_at,last_seen_at) values (?,?,now(),now()-interval '181 days')", staleDevice, staleDevice);
+        Long address = jdbc.queryForObject("insert into tracked_address(id,address) values(nextval('tracked_addr_id_seq'),decode('" + "77".repeat(20) + "','hex')) returning id", Long.class);
+
+        try (var cleanupConnection = dataSource.getConnection();
+                ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            cleanupConnection.setAutoCommit(false);
+            try (var lock = cleanupConnection.prepareStatement("""
+                    select id from device
+                    where id = ? and last_seen_at < now() - interval '180 days'
+                    for update
+                    """)) {
+                lock.setObject(1, staleDevice);
+                assertThat(lock.executeQuery().next()).isTrue();
+            }
+
+            CountDownLatch insertStarted = new CountDownLatch(1);
+            Future<Exception> lateInsert = executor.submit(() -> {
+                try (var connection = dataSource.getConnection();
+                        var statement = connection.prepareStatement("""
+                                insert into user_account(id,created_at,device_id,tracked_address_id)
+                                values(nextval('user_acc_id_seq'),now(),?,?)
+                                """)) {
+                    insertStarted.countDown();
+                    statement.setObject(1, staleDevice);
+                    statement.setLong(2, address);
+                    statement.executeUpdate();
+                    return null;
+                } catch (Exception exception) {
+                    return exception;
+                }
+            });
+
+            assertThat(insertStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            Thread.sleep(100);
+            assertThat(lateInsert.isDone()).isFalse();
+
+            try (var deletion = cleanupConnection.prepareStatement("delete from device where id = ?")) {
+                deletion.setObject(1, staleDevice);
+                assertThat(deletion.executeUpdate()).isEqualTo(1);
+            }
+            cleanupConnection.commit();
+
+            Exception failure = lateInsert.get(5, TimeUnit.SECONDS);
+            assertThat(failure).isInstanceOf(SQLException.class);
+            assertThat(((SQLException) failure).getSQLState()).isEqualTo("23503");
+        }
+
+        assertThat(devices.findById(staleDevice)).isEmpty();
+        assertThat(userAccounts.countByTrackedAddressId(address)).isZero();
+        assertThat(trackedAddresses.findById(address)).isPresent();
     }
 
     private void insertAccount(UUID device, Long address) {
@@ -680,6 +956,17 @@ class BackendCompatibilityTest {
         return migration;
     }
 
+    private boolean trackedAddressIndexIsValid(String schema) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                select index_metadata.indisvalid
+                from pg_index index_metadata
+                join pg_class index_relation on index_relation.oid = index_metadata.indexrelid
+                join pg_namespace index_schema on index_schema.oid = index_relation.relnamespace
+                where index_schema.nspname = ?
+                  and index_relation.relname = 'idx_user_account_tracked_address_id'
+                """, Boolean.class, schema));
+    }
+
     private JsonNode balanceRequest(String token) throws Exception {
         var request = get("/api/core/v1/wallet/balances").param("addresses", ADDRESS);
         if (token != null) request.param("tokenAddresses", token);
@@ -687,7 +974,31 @@ class BackendCompatibilityTest {
     }
 
     private Map<String, Object> pending(String hash, String token, String amount, String fee) {
-        return Map.of("hash", hash, "from", ADDRESS, "tokenAddress", token, "amount", amount, "fee", fee);
+        return Map.of(
+                "hash", hash,
+                "addedAt", "2026-09-01T12:00:00Z",
+                "transferType", "TRANSFER",
+                "from", ADDRESS,
+                "to", "0x" + "44".repeat(20),
+                "tokenAddress", token,
+                "amount", amount,
+                "fee", fee,
+                "nonce", 1L);
+    }
+
+    private Map<String, Object> confirmed(String hash, long nonce, long blockHeight) {
+        return Map.ofEntries(
+                Map.entry("txHash", hash),
+                Map.entry("nonce", nonce),
+                Map.entry("blockHeight", blockHeight),
+                Map.entry("blockHash", "0x" + "55".repeat(32)),
+                Map.entry("timestamp", "2026-09-01T12:00:00Z"),
+                Map.entry("type", "TRANSFER"),
+                Map.entry("from", ADDRESS),
+                Map.entry("to", "0x" + "44".repeat(20)),
+                Map.entry("tokenAddress", ZERO),
+                Map.entry("amount", "1"),
+                Map.entry("fee", "1"));
     }
 
     private String largestSignedTransferAtOrBelow(int maxBytes) throws Exception {
@@ -726,7 +1037,7 @@ class BackendCompatibilityTest {
     @Hidden
     @RestController
     static class ProbeController {
-        @GetMapping("/api/core/v1/review/client-ip")
+        @GetMapping("/api/review/client-ip")
         String clientIp(HttpServletRequest request) { return request.getRemoteAddr(); }
     }
 

@@ -4,6 +4,8 @@ import { Lock } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import z from 'zod/v4'
+import { BiometricMigrationError } from '../../services/BiometricService'
+import { WalletVaultCorruptionError } from '../../services/WalletVaultService'
 import { useWalletStore } from '../../store/WalletStore'
 import { BiometricUnlock } from './BiometricUnlock'
 
@@ -24,7 +26,7 @@ export interface UnlockCardProps {
 }
 
 export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biometric = true, btnLabel }: UnlockCardProps) => {
-    const checkPassword = useWalletStore((state) => state.checkPassword)
+    const unlockWithPassword = useWalletStore((state) => state.unlockWithPassword)
     const busy = useRef(false)
     const [pending, setPending] = useState(false)
     const setPendingAuthentication = (value: boolean) => { busy.current = value; setPending(value) }
@@ -36,24 +38,24 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
         mode: 'onChange',
     })
 
-    const handleBiometricUnlockFailed = () => {
-        form.setError('password', {
-            type: 'manual',
-            message: 'Biometric authentication cancelled',
-        })
+    const handleBiometricUnlockFailed = (failure?: unknown) => {
+        let message = 'Biometric authentication failed. Use your password.'
+        if (failure instanceof WalletVaultCorruptionError) {
+            message = failure.message
+        } else if (failure instanceof BiometricMigrationError) {
+            if (failure.code === 'BIOMETRIC_CANCELLED') message = 'Biometric verification was cancelled or timed out.'
+            else if (failure.code === 'BIOMETRIC_CLEANUP_PENDING') message = 'Biometric migration is pending. Enter your password to finish it safely.'
+            else if (failure.code === 'BIOMETRIC_GENERATION_CHANGED' || failure.code === 'BIOMETRIC_SUPERSEDED') message = 'Biometric settings changed. Retry or use your password.'
+            else message = failure.message
+        }
+        form.setError('password', { type: 'manual', message })
     }
 
-    const handleBiometricUnlock = async (pass: string) => {
+    const handleBiometricUnlock = async (result: { password: string, mnemonic: string }) => {
         try {
-            const result = await checkPassword(pass)
-            if (!result) {
-                handleBiometricUnlockFailed()
-                onFailed?.()
-                return
-            }
-            await onSuccess({ password: pass, mnemonic: result })
-        } catch {
-            handleBiometricUnlockFailed()
+            await onSuccess(result)
+        } catch (error) {
+            handleBiometricUnlockFailed(error)
             onFailed?.()
         } finally {
             form.setValue('password', '')
@@ -64,11 +66,9 @@ export const UnlockCard = ({ onSuccess, onFailed, title, description, icon, biom
         if (busy.current) return
         setPendingAuthentication(true)
         try {
-            const result = await checkPassword(data.password)
+            const result = await unlockWithPassword(data.password)
             if (result) {
-                const warning = await useWalletStore.getState().retireLegacyWithPassword(data.password)
                 await onSuccess({ password: data.password, mnemonic: result })
-                if (warning) useWalletStore.setState({ error: warning })
                 return
             }
             form.setError('password', {

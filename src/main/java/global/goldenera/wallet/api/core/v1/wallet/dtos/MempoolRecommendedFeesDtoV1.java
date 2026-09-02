@@ -23,9 +23,16 @@
  */
 package global.goldenera.wallet.api.core.v1.wallet.dtos;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+
 public record MempoolRecommendedFeesDtoV1(
-        MempoolRecommendedFeesLevelDtoV1 slow,
-        MempoolRecommendedFeesLevelDtoV1 standard,
-        MempoolRecommendedFeesLevelDtoV1 fast,
-        Long mempoolSize) {
+        @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) MempoolRecommendedFeesLevelDtoV1 slow,
+        @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) MempoolRecommendedFeesLevelDtoV1 standard,
+        @NotNull @Schema(requiredMode = Schema.RequiredMode.REQUIRED) MempoolRecommendedFeesLevelDtoV1 fast,
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$")
+        @Schema(description = "Canonical non-negative decimal mempool transaction count",
+                requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String mempoolSize) {
 }

@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { RegisterOptions, RegisterStatus200, RegisterStatus400, RegisterStatus401, RegisterStatus404, RegisterStatus409, RegisterStatus413, RegisterStatus500, RegisterStatus504 } from '../../models/Register'
+import type { RegisterOptions, RegisterStatus200 } from '../../models/Register'
 import type { UseMutationOptions, UseMutationResult, QueryClient } from '@tanstack/react-query'
 import { register } from '../../clients/register'
 import { mutationOptions, useMutation } from '@tanstack/react-query'
@@ -13,7 +13,7 @@ export const registerMutationKey = () => [{ url: '/api/core/v1/device/register' 
 
 export function registerMutationOptions<TContext = unknown>(config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const mutationKey = registerMutationKey()
-  return mutationOptions<RegisterStatus200, ResponseErrorConfig<RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504>, RegisterOptions, TContext>({
+  return mutationOptions<RegisterStatus200, ResponseErrorConfig<Error>, RegisterOptions, TContext>({
     mutationKey,
     mutationFn: async({ body }) => {
       const { data } = await register({ ...config, body, throwOnError: true })
@@ -23,23 +23,23 @@ export function registerMutationOptions<TContext = unknown>(config: Partial<Omit
 }
 
 /**
- * @description Register a new device or update existing one
- * @summary Register device
+ * @description Rolling-retirement endpoint; persistence remains configurable until old backend replicas drain
+ * @summary Acknowledge legacy device registration
  * {@link /api/core/v1/device/register}
  */
 export function useRegisterHook<TContext>(options: {
-  mutation?: UseMutationOptions<RegisterStatus200, ResponseErrorConfig<RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504>, RegisterOptions, TContext> & { client?: QueryClient },
+  mutation?: UseMutationOptions<RegisterStatus200, ResponseErrorConfig<Error>, RegisterOptions, TContext> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>,
 } = {}) {
   const { mutation = {}, client: config = {} } = options ?? {}
   const { client: queryClient, ...mutationOptions } = mutation;
   const mutationKey = mutationOptions.mutationKey ?? registerMutationKey()
 
-  const baseOptions = registerMutationOptions(config) as UseMutationOptions<RegisterStatus200, ResponseErrorConfig<RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504>, RegisterOptions, TContext>
+  const baseOptions = registerMutationOptions(config) as UseMutationOptions<RegisterStatus200, ResponseErrorConfig<Error>, RegisterOptions, TContext>
 
-  return useMutation<RegisterStatus200, ResponseErrorConfig<RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504>, RegisterOptions, TContext>({
+  return useMutation<RegisterStatus200, ResponseErrorConfig<Error>, RegisterOptions, TContext>({
     ...baseOptions,
     mutationKey,
     ...mutationOptions,
-  }, queryClient) as UseMutationResult<RegisterStatus200, ResponseErrorConfig<RegisterStatus400 | RegisterStatus401 | RegisterStatus404 | RegisterStatus409 | RegisterStatus413 | RegisterStatus500 | RegisterStatus504>, RegisterOptions, TContext>
+  }, queryClient) as UseMutationResult<RegisterStatus200, ResponseErrorConfig<Error>, RegisterOptions, TContext>
 }

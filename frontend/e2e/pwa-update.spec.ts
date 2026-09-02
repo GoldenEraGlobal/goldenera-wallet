@@ -41,6 +41,7 @@ for (const scenario of cases) test(`forward upgrade preserves access: ${scenario
   })
   await new Promise<void>(ready => server.listen(0, '127.0.0.1', ready))
   const origin = `http://localhost:${(server.address() as { port: number }).port}`
+  const cachedClient = await context.newPage()
   let cdp: CDPSession | undefined
   let authenticatorId: string | undefined
   let assertions = 0
@@ -60,6 +61,12 @@ for (const scenario of cases) test(`forward upgrade preserves access: ${scenario
   const prfKey = 'CapacitorStorage.ge_basic:biometric_prf_v2'
   const legacyKey = 'CapacitorStorage.ge_basic:biometric_encrypted_password'
   try {
+    // Keep a pre-update production page alive from the no-wallet state. This is
+    // the exact class of cached client that could otherwise start a raw seed
+    // write without participating in the current bundle's Web Lock.
+    await cachedClient.goto(origin)
+    await cachedClient.evaluate(async () => { await navigator.serviceWorker.ready })
+    await cachedClient.waitForFunction(() => navigator.serviceWorker.controller !== null)
     await importPublicWallet(page, origin)
     if (scenario.authentication === 'prf') await page.waitForFunction(key => localStorage.getItem(key) !== null, prfKey)
     if (scenario.authentication === 'legacy') await page.waitForFunction(key => localStorage.getItem(key) !== null, legacyKey)
@@ -88,6 +95,22 @@ for (const scenario of cases) test(`forward upgrade preserves access: ${scenario
       await page.reload()
     }
     await expect(page.locator(`script[src="${currentEntry}"]`)).toHaveCount(1)
+    const barrierResponse = await page.evaluate(async protocol => {
+      const controller = navigator.serviceWorker.controller
+      if (!controller) return { ok: false, reason: 'missing-controller' }
+      return new Promise<{ ok: boolean; reason?: string }>(resolve => {
+        const requestId = crypto.randomUUID()
+        const channel = new MessageChannel()
+        const timer = setTimeout(() => resolve({ ok: false, reason: 'timeout' }), 15_000)
+        channel.port1.onmessage = event => {
+          clearTimeout(timer)
+          resolve(event.data)
+        }
+        controller.postMessage({ type: 'GE_WALLET_RESET_PREPARE', protocol, requestId }, [channel.port2])
+      })
+    }, 'goldenera-wallet-reset-barrier-v1')
+    expect(barrierResponse).toMatchObject({ ok: true })
+    await expect(cachedClient.locator(`script[src="${currentEntry}"]`)).toHaveCount(1)
     await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
     let password = TEST_PASSWORD
     if (scenario.authentication === 'prf') {
@@ -120,6 +143,7 @@ for (const scenario of cases) test(`forward upgrade preserves access: ${scenario
     await page.getByRole('button', { name: 'Unlock', exact: true }).click()
     await expect(page.getByText(`${PUBLIC_ADDRESS.slice(0, 8)}...${PUBLIC_ADDRESS.slice(-6)}`, { exact: true })).toBeVisible()
   } finally {
+    await cachedClient.close().catch(() => undefined)
     if (cdp && authenticatorId) {
       await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId })
       await cdp.send('WebAuthn.disable')

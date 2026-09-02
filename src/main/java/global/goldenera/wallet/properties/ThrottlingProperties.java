@@ -25,20 +25,53 @@ package global.goldenera.wallet.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
 
+import global.goldenera.wallet.service.system.CoreRoutePolicyRegistry;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
+@Validated
 @Configuration
 @ConfigurationProperties(prefix = "ge.throttling", ignoreUnknownFields = false)
 public class ThrottlingProperties {
 
-	long globalCapacity;
-	long globalRefillTokens;
+    @Min(1)
+    long globalCapacity;
+    @Min(1)
+    long globalRefillTokens;
 
-	long publicCoreCapacity;
-	long publicCoreRefillTokens;
+    @Min(1)
+    long publicCoreCapacity;
+    @Min(1)
+    long publicCoreRefillTokens;
+
+    @Min(1)
+    long globalInFlightRequests = 256;
+    @Min(1)
+    long globalInFlightBytes = 256L * 1024 * 1024;
+    @Min(1)
+    long perIpInFlightRequests = 32;
+    @Min(1)
+    long perIpInFlightBytes = 64L * 1024 * 1024;
+
+    @AssertTrue(message = "global in-flight request limit must be at least the per-IP limit")
+    public boolean isGlobalRequestAdmissionAtLeastPerIp() {
+        return globalInFlightRequests >= perIpInFlightRequests;
+    }
+
+    @AssertTrue(message = "global in-flight byte limit must be at least the per-IP limit")
+    public boolean isGlobalByteAdmissionAtLeastPerIp() {
+        return globalInFlightBytes >= perIpInFlightBytes;
+    }
+
+    @AssertTrue(message = "per-IP in-flight byte limit must admit the largest Core route")
+    public boolean isLargestCoreRouteAdmissible() {
+        return perIpInFlightBytes >= CoreRoutePolicyRegistry.MAX_ROUTE_RESERVATION_BYTES;
+    }
 
 }

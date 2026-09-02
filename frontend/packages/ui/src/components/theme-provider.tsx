@@ -1,13 +1,12 @@
-
 import { createContext, useContext, useEffect, useState } from 'react'
 
 export const getSystemTheme = (): 'light' | 'dark' => {
-  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-    .matches
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light'
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
-
-  return systemTheme
 }
 
 export type Theme = 'dark' | 'light' | 'system'
@@ -30,6 +29,9 @@ type ThemeProviderState = {
   setTheme: (theme: Theme) => void
 }
 
+const isTheme = (value: unknown): value is Theme =>
+  value === 'dark' || value === 'light' || value === 'system'
+
 const initialState: ThemeProviderState = {
   theme: 'system',
   computedTheme: getSystemTheme(),
@@ -45,45 +47,72 @@ export function ThemeProvider({
   storage,
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme)
+  const [theme, setThemeState] = useState<Theme>(defaultTheme)
   const [computedTheme, setComputedTheme] = useState<'light' | 'dark'>(getSystemTheme())
   const [isLoaded, setIsLoaded] = useState(!storage)
 
   useEffect(() => {
-    if (storage) {
-      console.log('Loading theme from storage')
-      storage.getItem(storageKey).then((savedTheme) => {
-        if (savedTheme) {
-          setTheme(savedTheme as Theme)
-        }
-        setIsLoaded(true)
-      })
+    let active = true
+    if (!storage) {
+      setIsLoaded(true)
+      return () => { active = false }
     }
+
+    setIsLoaded(false)
+    void (async () => {
+      try {
+        const savedTheme = await storage.getItem(storageKey)
+        if (active && isTheme(savedTheme)) {
+          setThemeState(savedTheme)
+        }
+      } catch {
+        // Theme storage is optional. A failed preference read must not hide the app.
+      } finally {
+        if (active) setIsLoaded(true)
+      }
+    })()
+
+    return () => { active = false }
   }, [storage, storageKey])
 
   useEffect(() => {
     if (!isLoaded) return
 
     const root = window.document.documentElement
-    root.classList.remove('light', 'dark')
-
-    if (theme === 'system') {
-      root.classList.add(getSystemTheme())
-      setComputedTheme(getSystemTheme())
-      return
+    const media = theme === 'system' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)')
+      : null
+    const applyTheme = () => {
+      const nextTheme = theme === 'system'
+        ? media?.matches ? 'dark' : 'light'
+        : theme
+      root.classList.remove('light', 'dark')
+      root.classList.add(nextTheme)
+      setComputedTheme(nextTheme)
     }
 
-    root.classList.add(theme)
-    setComputedTheme(theme)
+    applyTheme()
+    if (!media) return
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', applyTheme)
+      return () => media.removeEventListener('change', applyTheme)
+    }
+
+    // Safari versions used by older cached PWAs expose only the legacy API.
+    media.addListener?.(applyTheme)
+    return () => media.removeListener?.(applyTheme)
   }, [theme, isLoaded])
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
+    setTheme: (nextTheme: Theme) => {
+      setThemeState(nextTheme)
       if (storage) {
-        storage.setItem(storageKey, theme)
+        void storage.setItem(storageKey, nextTheme).catch(() => {
+          // Keep the in-memory preference usable even when persistence is unavailable.
+        })
       }
-      setTheme(theme)
     },
     computedTheme,
   }

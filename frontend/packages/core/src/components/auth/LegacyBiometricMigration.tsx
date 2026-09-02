@@ -1,6 +1,8 @@
 import { Alert, AlertDescription, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, PasswordInput } from '@project/ui'
 import { useEffect, useRef, useState } from 'react'
-import { LegacyRecoveryEnrollmentError, useWalletStore, type LegacyRecovery } from '../../store/WalletStore'
+import { BiometricMigrationError } from '../../services/BiometricService'
+import { WalletVaultCorruptionError } from '../../services/WalletVaultService'
+import { LegacyRecoveryCompletionError, useWalletStore, type LegacyRecovery, type LegacyRecoveryNextAction } from '../../store/WalletStore'
 
 /** One-time recovery only; legacy credentials are never a normal unlock option. */
 export const LegacyBiometricMigration = () => {
@@ -14,18 +16,21 @@ export const LegacyBiometricMigration = () => {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
-  const [postCommitFailure, setPostCommitFailure] = useState(false)
+  const [nextAction, setNextAction] = useState<LegacyRecoveryNextAction | null>(null)
   const busy = useRef(false)
   const ownsRecovery = useRef(false)
 
   useEffect(() => {
+    ownsRecovery.current = false
     setRecovery(null)
     setPassword('')
     setConfirm('')
+    setNextAction(null)
   }, [revision])
 
   useEffect(() => () => {
     if (ownsRecovery.current) cancel()
+    ownsRecovery.current = false
   }, [cancel])
 
   useEffect(() => {
@@ -57,10 +62,21 @@ export const LegacyBiometricMigration = () => {
     ownsRecovery.current = true
     setPending(true)
     setError(null)
-    try { setRecovery(await recover()) } catch {
+    setNextAction(null)
+    try { setRecovery(await recover()) } catch (failure) {
       cancel()
       ownsRecovery.current = false
-      setError('Legacy verification was cancelled or unavailable. Use your password or recovery phrase instead.')
+      if (failure instanceof WalletVaultCorruptionError) {
+        setError(failure.message)
+      } else if (failure instanceof BiometricMigrationError) {
+        if (failure.code === 'BIOMETRIC_CANCELLED') setError('Legacy authenticator verification was cancelled or timed out. Retry or use your recovery phrase.')
+        else if (failure.code === 'BIOMETRIC_SUPERSEDED' || failure.code === 'BIOMETRIC_GENERATION_CHANGED') setError('Wallet or biometric settings changed. Start verification again.')
+        else if (failure.code === 'BIOMETRIC_GENERATION_MALFORMED') setError('Biometric metadata is damaged. Unlock with your password to reset biometric access safely.')
+        else if (failure.code === 'BIOMETRIC_MALFORMED_STATE') setError('Older biometric recovery data is incomplete. Use your password or recovery phrase.')
+        else setError(failure.message)
+      } else {
+        setError('Legacy verification is unavailable. Use your password or recovery phrase instead.')
+      }
     }
     finally { busy.current = false; setPending(false) }
   }
@@ -73,19 +89,34 @@ export const LegacyBiometricMigration = () => {
     setError(null)
     try {
       await complete(recovery, password)
+      ownsRecovery.current = false
       setRecovery(null)
       setPassword('')
       setConfirm('')
     } catch (failure) {
-      if (failure instanceof LegacyRecoveryEnrollmentError) {
+      const clearForm = (action: LegacyRecoveryNextAction) => {
+        // cancel() can only revoke a ticket now; it cannot defeat a redeemed
+        // Store operation that is still finishing after unmount/cancellation.
         cancel()
         ownsRecovery.current = false
         setRecovery(null)
         setPassword('')
         setConfirm('')
-        setPostCommitFailure(true)
+        setNextAction(action)
       }
-      setError(failure instanceof Error ? failure.message : 'Recovery upgrade could not finish. Keep the new password and retry.')
+      if (failure instanceof LegacyRecoveryCompletionError) {
+        if (failure.authorityConsumed || failure.code === 'AUTHORITY_UNAVAILABLE' || failure.code === 'DUPLICATE') {
+          clearForm(failure.nextAction)
+        }
+        // PASSWORD_INVALID is the sole typed pre-redemption completion failure
+        // that leaves the form intact for an edit.
+        setError(failure.message)
+      } else {
+        // Never infer authority ownership from a short exception list. Unknown
+        // Store failures fail closed rather than rendering a stale form.
+        clearForm('verify-again')
+        setError(failure instanceof Error ? failure.message : 'Recovery upgrade could not finish. Verify your authenticator again before retrying.')
+      }
     } finally { busy.current = false; setPending(false) }
   }
 
@@ -101,7 +132,9 @@ export const LegacyBiometricMigration = () => {
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">This does not protect copies of older wallet data that somebody may already have obtained.</p>
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-        {postCommitFailure ? (
+        {nextAction === 'reload-and-check-new-password' ? (
+          <p className="text-sm">The password replacement may have been saved. Reload the wallet and check the new password before trying recovery again.</p>
+        ) : nextAction === 'unlock-with-new-password' ? (
           <p className="text-sm">The new password is saved. Unlock the wallet with that password, then retry Biometrics in Settings.</p>
         ) : recovery ? (
           <form onSubmit={finish} className="space-y-3">
@@ -112,7 +145,10 @@ export const LegacyBiometricMigration = () => {
             <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={() => { cancel(); ownsRecovery.current = false; setRecovery(null); setPassword(''); setConfirm('') }}>Cancel recovery</Button>
           </form>
         ) : (
-          <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={() => void start()}>{pending ? 'Verifying...' : 'Recover legacy biometric access'}</Button>
+          <>
+            {nextAction === 'verify-again' && <p className="text-sm">Verify your authenticator again before choosing a new password.</p>}
+            <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={() => void start()}>{pending ? 'Verifying...' : 'Recover legacy biometric access'}</Button>
+          </>
         )}
       </CardContent>
     </Card>

@@ -48,7 +48,9 @@ class SecureStorageServiceImpl implements SecureStorageAdapter {
     async get(key: string, options?: SecureStorageOptions): Promise<string | null> {
         if (!await this.exists(key)) return null
         const { value } = await SecureStoragePlugin.get({ key: this.getFullKey(key) })
-        if (!value) throw new Error('Stored wallet data is empty or unreadable')
+        // A present empty string is still persisted bytes. Return it so the
+        // wallet-vault parser can classify it as corruption rather than absence.
+        if (value === null) throw new Error('Stored wallet data is unreadable')
         return options?.password ? CryptoUtil.decrypt(value, options.password) : value
     }
 

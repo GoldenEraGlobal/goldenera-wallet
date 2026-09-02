@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@goldenera/cryptoj': coreRequire.resolve('@goldenera/cryptoj'),
+      '@capacitor/app': coreRequire.resolve('@capacitor/app'),
       '@tanstack/react-query': coreRequire.resolve('@tanstack/react-query'),
       '@capacitor/preferences': coreRequire.resolve('@capacitor/preferences'),
       '@capacitor/core': coreRequire.resolve('@capacitor/core'),

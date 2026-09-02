@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: wallet-device-last-seen-index-v1
+      author: goldenera
+      runInTransaction: false
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: >-
+              DROP INDEX CONCURRENTLY IF EXISTS
+              idx_device_last_seen_at_id
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: >-
+              CREATE INDEX CONCURRENTLY
+              idx_device_last_seen_at_id
+              ON device (last_seen_at, id)

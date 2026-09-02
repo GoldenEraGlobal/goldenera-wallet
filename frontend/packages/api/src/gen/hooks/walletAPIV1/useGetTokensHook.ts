@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetTokensStatus200, GetTokensStatus400, GetTokensStatus401, GetTokensStatus404, GetTokensStatus409, GetTokensStatus413, GetTokensStatus500, GetTokensStatus504 } from '../../models/GetTokens'
+import type { GetTokensStatus200 } from '../../models/GetTokens'
 import type { QueryKey, QueryClient, QueryObserverOptions, UseQueryResult } from '@tanstack/react-query'
 import { getTokens } from '../../clients/getTokens'
 import { queryOptions, useQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetTokensQueryKey = ReturnType<typeof getTokensQueryKey>
 
 export function getTokensQueryOptions(config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getTokensQueryKey()
-  return queryOptions<GetTokensStatus200, ResponseErrorConfig<GetTokensStatus400 | GetTokensStatus401 | GetTokensStatus404 | GetTokensStatus409 | GetTokensStatus413 | GetTokensStatus500 | GetTokensStatus504>, GetTokensStatus200, typeof queryKey>({
+  return queryOptions<GetTokensStatus200, ResponseErrorConfig<Error>, GetTokensStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getTokens({ ...config, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getTokensQueryOptions(config: Partial<Omit<RequestConfig, 'path'
  * {@link /api/core/v1/wallet/tokens}
  */
 export function useGetTokensHook<TData = GetTokensStatus200, TQueryData = GetTokensStatus200, TQueryKey extends QueryKey = GetTokensQueryKey>(options: {
-  query?: Partial<QueryObserverOptions<GetTokensStatus200, ResponseErrorConfig<GetTokensStatus400 | GetTokensStatus401 | GetTokensStatus404 | GetTokensStatus409 | GetTokensStatus413 | GetTokensStatus500 | GetTokensStatus504>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<QueryObserverOptions<GetTokensStatus200, ResponseErrorConfig<Error>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -41,7 +41,7 @@ export function useGetTokensHook<TData = GetTokensStatus200, TQueryData = GetTok
    ...getTokensQueryOptions(config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<GetTokensStatus400 | GetTokensStatus401 | GetTokensStatus404 | GetTokensStatus409 | GetTokensStatus413 | GetTokensStatus500 | GetTokensStatus504>> & { queryKey: TQueryKey }
+  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

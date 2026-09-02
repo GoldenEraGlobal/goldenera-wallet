@@ -20,11 +20,11 @@ export type UnifiedTransferPageDtoV1 = {
     */
     pageSize?: number;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal total transfer count
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    totalElements?: bigint;
+    totalElements?: string;
     /**
      * @description
      * Format: `int32`
@@ -32,17 +32,17 @@ export type UnifiedTransferPageDtoV1 = {
     */
     totalPages?: number;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal pending transfer count
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    pendingCount?: bigint;
+    pendingCount?: string;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal confirmed transfer count
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    confirmedCount?: bigint;
+    confirmedCount?: string;
     first?: boolean;
     last?: boolean;
 };

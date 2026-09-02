@@ -41,6 +41,15 @@ public interface TrackedAddressRepository
                 ListPagingAndSortingRepository<TrackedAddress, Long>,
                 JpaSpecificationExecutor<TrackedAddress> {
 
+        @Query(nativeQuery = true, value = """
+                        SELECT ta.id
+                        FROM tracked_address ta
+                        WHERE ta.id IN :ids
+                        ORDER BY ta.id
+                        FOR UPDATE OF ta SKIP LOCKED
+                        """)
+        List<Long> lockIdsForCleanup(Collection<Long> ids);
+
         /**
          * Finds TrackedAddress entities that:
          * 1. Have an ID in the given collection

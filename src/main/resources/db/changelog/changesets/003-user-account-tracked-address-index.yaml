@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: wallet-user-account-tracked-address-index-v1
+      author: goldenera
+      runInTransaction: false
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: >-
+              DROP INDEX CONCURRENTLY IF EXISTS
+              idx_user_account_tracked_address_id
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: >-
+              CREATE INDEX CONCURRENTLY
+              idx_user_account_tracked_address_id
+              ON user_account (tracked_address_id)

@@ -12,11 +12,11 @@ export type WalletBalanceDtoV1 = {
     */
     balance?: string;
     /**
-     * @description
-     * Format: `int64`
-     * @type integer | undefined
+     * @description Canonical non-negative decimal block height
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string | undefined
     */
-    updatedAtBlockHeight?: bigint;
+    updatedAtBlockHeight?: string;
     /**
      * @description
      * Format: `date-time`
@@ -25,9 +25,9 @@ export type WalletBalanceDtoV1 = {
     updatedAtTimestamp?: string;
     /**
      * @description Full confirmed amount including locked mining rewards
-     * @type string | undefined
+     * @type string
     */
-    totalBalance?: string;
+    totalBalance: string;
     /**
      * @description Confirmed mining rewards that cannot yet be spent
      * @type string | undefined

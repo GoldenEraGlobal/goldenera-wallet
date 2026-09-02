@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetTokenByAddressOptions, GetTokenByAddressStatus200, GetTokenByAddressStatus400, GetTokenByAddressStatus401, GetTokenByAddressStatus404, GetTokenByAddressStatus409, GetTokenByAddressStatus413, GetTokenByAddressStatus500, GetTokenByAddressStatus504 } from '../../models/GetTokenByAddress'
+import type { GetTokenByAddressOptions, GetTokenByAddressStatus200 } from '../../models/GetTokenByAddress'
 import type { QueryKey, QueryClient, UseSuspenseQueryOptions, UseSuspenseQueryResult } from '@tanstack/react-query'
 import { getTokenByAddress } from '../../clients/getTokenByAddress'
 import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetTokenByAddressSuspenseQueryKey = ReturnType<typeof getTokenByAddressSusp
 
 export function getTokenByAddressSuspenseQueryOptions({ query }: GetTokenByAddressOptions, config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getTokenByAddressSuspenseQueryKey({ query })
-  return queryOptions<GetTokenByAddressStatus200, ResponseErrorConfig<GetTokenByAddressStatus400 | GetTokenByAddressStatus401 | GetTokenByAddressStatus404 | GetTokenByAddressStatus409 | GetTokenByAddressStatus413 | GetTokenByAddressStatus500 | GetTokenByAddressStatus504>, GetTokenByAddressStatus200, typeof queryKey>({
+  return queryOptions<GetTokenByAddressStatus200, ResponseErrorConfig<Error>, GetTokenByAddressStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getTokenByAddress({ ...config, query, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getTokenByAddressSuspenseQueryOptions({ query }: GetTokenByAddre
  * {@link /api/core/v1/wallet/token}
  */
 export function useGetTokenByAddressSuspenseHook<TData = GetTokenByAddressStatus200, TQueryKey extends QueryKey = GetTokenByAddressSuspenseQueryKey>({ query }: { query: GetTokenByAddressOptions['query'] | (() => GetTokenByAddressOptions['query']) }, options: {
-  query?: Partial<UseSuspenseQueryOptions<GetTokenByAddressStatus200, ResponseErrorConfig<GetTokenByAddressStatus400 | GetTokenByAddressStatus401 | GetTokenByAddressStatus404 | GetTokenByAddressStatus409 | GetTokenByAddressStatus413 | GetTokenByAddressStatus500 | GetTokenByAddressStatus504>, TData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<UseSuspenseQueryOptions<GetTokenByAddressStatus200, ResponseErrorConfig<Error>, TData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -42,7 +42,7 @@ export function useGetTokenByAddressSuspenseHook<TData = GetTokenByAddressStatus
    ...getTokenByAddressSuspenseQueryOptions(resolvedParams, config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as UseSuspenseQueryOptions, queryClient) as UseSuspenseQueryResult<TData, ResponseErrorConfig<GetTokenByAddressStatus400 | GetTokenByAddressStatus401 | GetTokenByAddressStatus404 | GetTokenByAddressStatus409 | GetTokenByAddressStatus413 | GetTokenByAddressStatus500 | GetTokenByAddressStatus504>> & { queryKey: TQueryKey }
+  } as unknown as UseSuspenseQueryOptions, queryClient) as UseSuspenseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

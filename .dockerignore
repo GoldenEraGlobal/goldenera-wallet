@@ -1,17 +1,7 @@
-node_modules
-**/node_modules
-target
-.git
-dist
-frontend/apps/web/dist
-# Never include developer credentials or local review/runtime state in build context.
-.env
-.env.*
-**/.env
-**/.env.*
-.agents
-.codex
-docs/reviews
-**/.turbo
-**/playwright-report
-**/test-results
+# Production images are built from a temporary artifact-only context. Keep the
+# repository context fail-closed too: credentials, nested env files, Maven
+# settings, keys, keystores, local agent state, sources, and runtime overrides
+# are all excluded unless they are one of the two explicitly allowed files.
+**
+!Dockerfile
+!app.jar

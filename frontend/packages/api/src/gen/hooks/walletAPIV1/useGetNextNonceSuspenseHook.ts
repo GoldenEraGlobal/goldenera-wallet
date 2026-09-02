@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetNextNonceOptions, GetNextNonceStatus200, GetNextNonceStatus400, GetNextNonceStatus401, GetNextNonceStatus404, GetNextNonceStatus409, GetNextNonceStatus413, GetNextNonceStatus500, GetNextNonceStatus504 } from '../../models/GetNextNonce'
+import type { GetNextNonceOptions, GetNextNonceStatus200 } from '../../models/GetNextNonce'
 import type { QueryKey, QueryClient, UseSuspenseQueryOptions, UseSuspenseQueryResult } from '@tanstack/react-query'
 import { getNextNonce } from '../../clients/getNextNonce'
 import { queryOptions, useSuspenseQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetNextNonceSuspenseQueryKey = ReturnType<typeof getNextNonceSuspenseQueryK
 
 export function getNextNonceSuspenseQueryOptions({ query }: GetNextNonceOptions, config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getNextNonceSuspenseQueryKey({ query })
-  return queryOptions<GetNextNonceStatus200, ResponseErrorConfig<GetNextNonceStatus400 | GetNextNonceStatus401 | GetNextNonceStatus404 | GetNextNonceStatus409 | GetNextNonceStatus413 | GetNextNonceStatus500 | GetNextNonceStatus504>, GetNextNonceStatus200, typeof queryKey>({
+  return queryOptions<GetNextNonceStatus200, ResponseErrorConfig<Error>, GetNextNonceStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getNextNonce({ ...config, query, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getNextNonceSuspenseQueryOptions({ query }: GetNextNonceOptions,
  * {@link /api/core/v1/wallet/next-nonce}
  */
 export function useGetNextNonceSuspenseHook<TData = GetNextNonceStatus200, TQueryKey extends QueryKey = GetNextNonceSuspenseQueryKey>({ query }: { query: GetNextNonceOptions['query'] | (() => GetNextNonceOptions['query']) }, options: {
-  query?: Partial<UseSuspenseQueryOptions<GetNextNonceStatus200, ResponseErrorConfig<GetNextNonceStatus400 | GetNextNonceStatus401 | GetNextNonceStatus404 | GetNextNonceStatus409 | GetNextNonceStatus413 | GetNextNonceStatus500 | GetNextNonceStatus504>, TData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<UseSuspenseQueryOptions<GetNextNonceStatus200, ResponseErrorConfig<Error>, TData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -42,7 +42,7 @@ export function useGetNextNonceSuspenseHook<TData = GetNextNonceStatus200, TQuer
    ...getNextNonceSuspenseQueryOptions(resolvedParams, config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as UseSuspenseQueryOptions, queryClient) as UseSuspenseQueryResult<TData, ResponseErrorConfig<GetNextNonceStatus400 | GetNextNonceStatus401 | GetNextNonceStatus404 | GetNextNonceStatus409 | GetNextNonceStatus413 | GetNextNonceStatus500 | GetNextNonceStatus504>> & { queryKey: TQueryKey }
+  } as unknown as UseSuspenseQueryOptions, queryClient) as UseSuspenseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

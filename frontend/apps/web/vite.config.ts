@@ -62,6 +62,7 @@ export default defineConfig({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        importScripts: ['wallet-reset-barrier-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         globIgnores: ['**/logo_full.png'], // Exclude large files from precache
         runtimeCaching: [

@@ -5,7 +5,7 @@ import { historySyncPlugin } from '@stackflow/plugin-history-sync'
 import { basicRendererPlugin } from '@stackflow/plugin-renderer-basic'
 import { webRendererPlugin } from '@stackflow/plugin-renderer-web'
 import { stackflow } from '@stackflow/react'
-import { createMemoryHistory, type History } from 'history'
+import type { History } from 'history'
 import { useEffect, useState } from 'react'
 import {
     BackupPhrasePage,
@@ -27,6 +27,7 @@ import {
     isNotIos as isNotIosPlatform,
     shouldUseWebRenderer
 } from '../utils/PlatformUtil'
+import { CleanableHistory, type StackRealm } from './CleanableHistory'
 import { RootCtx } from './RootContext'
 
 export const TRANSITION_DURATION = 270
@@ -43,175 +44,6 @@ const basePlugins = [
     })
 ]
 const transitionDuration = useWebRenderer ? 0 : TRANSITION_DURATION
-
-// Custom history wrapper that can be properly cleaned up
-class CleanableHistory {
-    private history: History
-    private popstateHandler: ((event: PopStateEvent) => void) | null = null
-    private listeners: Set<() => void> = new Set()
-    private historyIndex = 0 // Track our position in browser history
-    private instanceId = Date.now().toString(36) + Math.random().toString(36).substr(2)
-
-    constructor() {
-        this.history = createMemoryHistory()
-    }
-
-    // Sync with browser for back/forward button support
-    startBrowserSync() {
-        if (typeof window !== 'undefined') {
-            // Update current entry with our instanceId
-            window.history.replaceState({
-                index: this.historyIndex,
-                instanceId: this.instanceId
-            }, '', window.location.href)
-
-            this.popstateHandler = (event: PopStateEvent) => {
-                try {
-                    const state = event.state
-
-                    // Check if this state belongs to our current history session
-                    if (state?.instanceId === this.instanceId) {
-                        const newIndex = state.index ?? 0
-                        const delta = newIndex - this.historyIndex
-
-                        this.historyIndex = newIndex
-
-                        if (delta !== 0) {
-                            this.history.go(delta)
-                        }
-                    } else {
-                        // Mismatch or foreign state (e.g. from reload or other session)
-                        // Force sync logic: Adopt this browser URL into our memory history
-                        // Extract path from hash
-                        const hash = window.location.hash
-                        const path = hash.startsWith('#') ? hash.substring(1) : '/'
-
-                        this.history.replace(path)
-
-                        // We reset our index logic effectively for this "new" entry
-                        // But we should claim it in browser state to prevent future mismatches
-                        this.historyIndex = state?.index ?? 0 // Adopt the browser's index if available to keep relative continuity if possible
-
-                        window.history.replaceState({
-                            index: this.historyIndex,
-                            instanceId: this.instanceId
-                        }, '', window.location.href)
-                    }
-                } finally {
-                    // History synchronization completes in this callback.
-                }
-            }
-            window.addEventListener('popstate', this.popstateHandler)
-        }
-    }
-
-    stopBrowserSync() {
-        if (this.popstateHandler && typeof window !== 'undefined') {
-            window.removeEventListener('popstate', this.popstateHandler)
-            this.popstateHandler = null
-        }
-    }
-
-    // Forward all history methods
-    get action() { return this.history.action }
-    get location() { return this.history.location }
-
-    push(...args: Parameters<History['push']>) {
-        this.history.push(...args)
-        if (typeof window !== 'undefined') {
-            this.historyIndex++
-            window.history.pushState(
-                { index: this.historyIndex, instanceId: this.instanceId },
-                '',
-                window.location.pathname + '#' + this.history.location.pathname
-            )
-        }
-    }
-
-    replace(...args: Parameters<History['replace']>) {
-        this.history.replace(...args)
-        if (typeof window !== 'undefined') {
-            window.history.replaceState(
-                { index: this.historyIndex, instanceId: this.instanceId },
-                '',
-                window.location.pathname + '#' + this.history.location.pathname
-            )
-        }
-    }
-
-    // Stackflow 3 history reconciliation uses go(delta), not only back()/forward().
-    go(delta: number) {
-        if (typeof window !== 'undefined') {
-            window.history.go(delta)
-        } else {
-            this.historyIndex += delta
-            this.history.go(delta)
-        }
-    }
-
-    back() {
-        if (typeof window !== 'undefined' && this.historyIndex > 0) {
-            window.history.back()
-        } else {
-            if (this.historyIndex > 0) {
-                this.historyIndex--
-            }
-            this.history.back()
-        }
-    }
-
-    forward() {
-        if (typeof window !== 'undefined') {
-            window.history.forward()
-        } else {
-            this.historyIndex++
-            this.history.forward()
-        }
-    }
-
-    listen(listener: Parameters<History['listen']>[0]) {
-        const unlisten = this.history.listen((update) => {
-            // Always sync browser hash after any navigation to ensure consistency
-            if (typeof window !== 'undefined') {
-                window.history.replaceState(
-                    { index: this.historyIndex, instanceId: this.instanceId },
-                    '',
-                    window.location.pathname + '#' + update.location.pathname
-                )
-            }
-            listener(update)
-        })
-        this.listeners.add(unlisten)
-        return () => {
-            unlisten()
-            this.listeners.delete(unlisten)
-        }
-    }
-
-    createHref(to: Parameters<History['createHref']>[0]) {
-        return this.history.createHref(to)
-    }
-
-    // Clean up everything
-    destroy() {
-        this.stopBrowserSync()
-        this.listeners.forEach(unlisten => unlisten())
-        this.listeners.clear()
-    }
-
-    // Reset to root
-    reset() {
-        this.historyIndex = 0
-        this.history.replace('/')
-        if (typeof window !== 'undefined') {
-            window.history.replaceState(
-                { index: this.historyIndex, instanceId: this.instanceId },
-                '',
-                window.location.pathname + '#/'
-            )
-        }
-    }
-}
 
 // All components are available to the renderer; each config registers only the
 // activities that belonged to that auth/backup stack before the v2 migration.
@@ -329,8 +161,14 @@ const StackManager = ({ status }: { status: StackStatus }) => {
     } | null>(null)
 
     useEffect(() => {
-        // Create new history and stack
-        const history = new CleanableHistory()
+        // Create a realm-bound history so browser Back/Forward can never adopt
+        // authenticated routes into a locked or backup stack.
+        const realm: StackRealm = status === 'unlocked'
+            ? 'authenticated'
+            : status === 'backup'
+                ? 'backup'
+                : 'unauthenticated'
+        const history = new CleanableHistory(realm)
         history.reset()
         history.startBrowserSync()
 

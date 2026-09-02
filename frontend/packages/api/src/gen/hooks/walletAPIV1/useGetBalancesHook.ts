@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetBalancesOptions, GetBalancesStatus200, GetBalancesStatus400, GetBalancesStatus401, GetBalancesStatus404, GetBalancesStatus409, GetBalancesStatus413, GetBalancesStatus500, GetBalancesStatus504 } from '../../models/GetBalances'
+import type { GetBalancesOptions, GetBalancesStatus200 } from '../../models/GetBalances'
 import type { QueryKey, QueryClient, QueryObserverOptions, UseQueryResult } from '@tanstack/react-query'
 import { getBalances } from '../../clients/getBalances'
 import { queryOptions, useQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetBalancesQueryKey = ReturnType<typeof getBalancesQueryKey>
 
 export function getBalancesQueryOptions({ query }: GetBalancesOptions, config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getBalancesQueryKey({ query })
-  return queryOptions<GetBalancesStatus200, ResponseErrorConfig<GetBalancesStatus400 | GetBalancesStatus401 | GetBalancesStatus404 | GetBalancesStatus409 | GetBalancesStatus413 | GetBalancesStatus500 | GetBalancesStatus504>, GetBalancesStatus200, typeof queryKey>({
+  return queryOptions<GetBalancesStatus200, ResponseErrorConfig<Error>, GetBalancesStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getBalances({ ...config, query, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getBalancesQueryOptions({ query }: GetBalancesOptions, config: P
  * {@link /api/core/v1/wallet/balances}
  */
 export function useGetBalancesHook<TData = GetBalancesStatus200, TQueryData = GetBalancesStatus200, TQueryKey extends QueryKey = GetBalancesQueryKey>({ query }: { query: GetBalancesOptions['query'] | (() => GetBalancesOptions['query']) }, options: {
-  query?: Partial<QueryObserverOptions<GetBalancesStatus200, ResponseErrorConfig<GetBalancesStatus400 | GetBalancesStatus401 | GetBalancesStatus404 | GetBalancesStatus409 | GetBalancesStatus413 | GetBalancesStatus500 | GetBalancesStatus504>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<QueryObserverOptions<GetBalancesStatus200, ResponseErrorConfig<Error>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -42,7 +42,7 @@ export function useGetBalancesHook<TData = GetBalancesStatus200, TQueryData = Ge
    ...getBalancesQueryOptions(resolvedParams, config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<GetBalancesStatus400 | GetBalancesStatus401 | GetBalancesStatus404 | GetBalancesStatus409 | GetBalancesStatus413 | GetBalancesStatus500 | GetBalancesStatus504>> & { queryKey: TQueryKey }
+  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

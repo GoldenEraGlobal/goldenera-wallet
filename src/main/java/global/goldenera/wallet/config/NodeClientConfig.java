@@ -23,8 +23,6 @@
  */
 package global.goldenera.wallet.config;
 
-import static lombok.AccessLevel.PRIVATE;
-
 import java.net.http.HttpClient;
 import java.util.concurrent.Executors;
 
@@ -46,19 +44,24 @@ import global.goldenera.wallet.client.node.api.v1.TransferApiV1Api;
 import global.goldenera.wallet.client.node.api.v1.TxApiV1Api;
 import global.goldenera.wallet.client.node.api.v1.WebhookApiV1Api;
 import global.goldenera.wallet.client.node.api.v1.WebhookEventApiV1Api;
-import global.goldenera.wallet.properties.NodeProperties;
 import global.goldenera.wallet.components.NodeResponseBufferingInterceptor;
-import lombok.AllArgsConstructor;
-import lombok.experimental.FieldDefaults;
+import global.goldenera.wallet.properties.NodeProperties;
 
 @Configuration
-@AllArgsConstructor
-@FieldDefaults(level = PRIVATE, makeFinal = true)
 public class NodeClientConfig {
 
-    NodeProperties nodeProperties;
-    NodeResponseBufferingInterceptor nodeResponseBufferingInterceptor;
-    ConversionService conversionService;
+    private final NodeProperties nodeProperties;
+    private final NodeResponseBufferingInterceptor nodeResponseBufferingInterceptor;
+    private final ConversionService conversionService;
+
+    public NodeClientConfig(
+            NodeProperties nodeProperties,
+            NodeResponseBufferingInterceptor nodeResponseBufferingInterceptor,
+            ConversionService conversionService) {
+        this.nodeProperties = nodeProperties;
+        this.nodeResponseBufferingInterceptor = nodeResponseBufferingInterceptor;
+        this.conversionService = conversionService;
+    }
 
     @Bean
     public HttpClient generalHttpClient() {

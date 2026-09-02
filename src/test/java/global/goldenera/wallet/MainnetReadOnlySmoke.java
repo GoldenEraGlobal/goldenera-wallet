@@ -171,7 +171,8 @@ public final class MainnetReadOnlySmoke {
         var second = wallet.getTransfers(Set.of(watch), Set.of(), 1, 5, null);
         RESULTS.put("historyPageSizes", List.of(first.content().size(), second.content().size()));
         RESULTS.put("historyTotalsAtRead", List.of(first.totalElements(), second.totalElements()));
-        RESULTS.put("nonceRead", wallet.getNextNonce(watch) >= 0);
+        String nextNonce = wallet.getNextNonce(watch);
+        RESULTS.put("nonceRead", nextNonce.matches("^(0|[1-9][0-9]*)$"));
         var fees = wallet.getMempoolRecommendedFees();
         RESULTS.put("feesRead", fees != null && fees.standard() != null);
         Address empty = Address.fromHexString("0x1111111111111111111111111111111111111111");

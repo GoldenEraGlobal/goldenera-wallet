@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetTransfersOptions, GetTransfersStatus200, GetTransfersStatus400, GetTransfersStatus401, GetTransfersStatus404, GetTransfersStatus409, GetTransfersStatus413, GetTransfersStatus500, GetTransfersStatus504 } from '../../models/GetTransfers'
+import type { GetTransfersOptions, GetTransfersStatus200 } from '../../models/GetTransfers'
 import type { QueryKey, QueryClient, QueryObserverOptions, UseQueryResult } from '@tanstack/react-query'
 import { getTransfers } from '../../clients/getTransfers'
 import { queryOptions, useQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetTransfersQueryKey = ReturnType<typeof getTransfersQueryKey>
 
 export function getTransfersQueryOptions({ query }: GetTransfersOptions, config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getTransfersQueryKey({ query })
-  return queryOptions<GetTransfersStatus200, ResponseErrorConfig<GetTransfersStatus400 | GetTransfersStatus401 | GetTransfersStatus404 | GetTransfersStatus409 | GetTransfersStatus413 | GetTransfersStatus500 | GetTransfersStatus504>, GetTransfersStatus200, typeof queryKey>({
+  return queryOptions<GetTransfersStatus200, ResponseErrorConfig<Error>, GetTransfersStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getTransfers({ ...config, query, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getTransfersQueryOptions({ query }: GetTransfersOptions, config:
  * {@link /api/core/v1/wallet/transfers}
  */
 export function useGetTransfersHook<TData = GetTransfersStatus200, TQueryData = GetTransfersStatus200, TQueryKey extends QueryKey = GetTransfersQueryKey>({ query }: { query: GetTransfersOptions['query'] | (() => GetTransfersOptions['query']) }, options: {
-  query?: Partial<QueryObserverOptions<GetTransfersStatus200, ResponseErrorConfig<GetTransfersStatus400 | GetTransfersStatus401 | GetTransfersStatus404 | GetTransfersStatus409 | GetTransfersStatus413 | GetTransfersStatus500 | GetTransfersStatus504>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<QueryObserverOptions<GetTransfersStatus200, ResponseErrorConfig<Error>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -42,7 +42,7 @@ export function useGetTransfersHook<TData = GetTransfersStatus200, TQueryData = 
    ...getTransfersQueryOptions(resolvedParams, config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<GetTransfersStatus400 | GetTransfersStatus401 | GetTransfersStatus404 | GetTransfersStatus409 | GetTransfersStatus413 | GetTransfersStatus500 | GetTransfersStatus504>> & { queryKey: TQueryKey }
+  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

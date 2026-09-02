@@ -38,7 +38,11 @@ export function assertTransferBalance(transfer: ReviewedTransfer, balances: Tran
   }
 }
 
-/** One user review authorizes at most one POST, including asynchronous preflight. */
+/**
+ * @deprecated Production transfer flows must use the durable TransferCoordinator.
+ * This legacy implementation is retained only for source compatibility and has no
+ * production callers.
+ */
 export class TransferSubmission {
   private pending = false
   private sent = false

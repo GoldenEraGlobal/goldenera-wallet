@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { GetMempoolRecommendedFeesStatus200, GetMempoolRecommendedFeesStatus400, GetMempoolRecommendedFeesStatus401, GetMempoolRecommendedFeesStatus404, GetMempoolRecommendedFeesStatus409, GetMempoolRecommendedFeesStatus413, GetMempoolRecommendedFeesStatus500, GetMempoolRecommendedFeesStatus504 } from '../../models/GetMempoolRecommendedFees'
+import type { GetMempoolRecommendedFeesStatus200 } from '../../models/GetMempoolRecommendedFees'
 import type { QueryKey, QueryClient, QueryObserverOptions, UseQueryResult } from '@tanstack/react-query'
 import { getMempoolRecommendedFees } from '../../clients/getMempoolRecommendedFees'
 import { queryOptions, useQuery } from '@tanstack/react-query'
@@ -15,7 +15,7 @@ type GetMempoolRecommendedFeesQueryKey = ReturnType<typeof getMempoolRecommended
 
 export function getMempoolRecommendedFeesQueryOptions(config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const queryKey = getMempoolRecommendedFeesQueryKey()
-  return queryOptions<GetMempoolRecommendedFeesStatus200, ResponseErrorConfig<GetMempoolRecommendedFeesStatus400 | GetMempoolRecommendedFeesStatus401 | GetMempoolRecommendedFeesStatus404 | GetMempoolRecommendedFeesStatus409 | GetMempoolRecommendedFeesStatus413 | GetMempoolRecommendedFeesStatus500 | GetMempoolRecommendedFeesStatus504>, GetMempoolRecommendedFeesStatus200, typeof queryKey>({
+  return queryOptions<GetMempoolRecommendedFeesStatus200, ResponseErrorConfig<Error>, GetMempoolRecommendedFeesStatus200, typeof queryKey>({
    queryKey,
    queryFn: async ({ signal }) => {
       const { data } = await getMempoolRecommendedFees({ ...config, signal: config.signal ?? signal, throwOnError: true })
@@ -30,7 +30,7 @@ export function getMempoolRecommendedFeesQueryOptions(config: Partial<Omit<Reque
  * {@link /api/core/v1/wallet/mempool-recommended-fees}
  */
 export function useGetMempoolRecommendedFeesHook<TData = GetMempoolRecommendedFeesStatus200, TQueryData = GetMempoolRecommendedFeesStatus200, TQueryKey extends QueryKey = GetMempoolRecommendedFeesQueryKey>(options: {
-  query?: Partial<QueryObserverOptions<GetMempoolRecommendedFeesStatus200, ResponseErrorConfig<GetMempoolRecommendedFeesStatus400 | GetMempoolRecommendedFeesStatus401 | GetMempoolRecommendedFeesStatus404 | GetMempoolRecommendedFeesStatus409 | GetMempoolRecommendedFeesStatus413 | GetMempoolRecommendedFeesStatus500 | GetMempoolRecommendedFeesStatus504>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
+  query?: Partial<QueryObserverOptions<GetMempoolRecommendedFeesStatus200, ResponseErrorConfig<Error>, TData, TQueryData, TQueryKey>> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>
 } = {}) {
   const { query: queryConfig = {}, client: config = {} } = options ?? {}
@@ -41,7 +41,7 @@ export function useGetMempoolRecommendedFeesHook<TData = GetMempoolRecommendedFe
    ...getMempoolRecommendedFeesQueryOptions(config),
    ...resolvedOptions,
    queryKey,
-  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<GetMempoolRecommendedFeesStatus400 | GetMempoolRecommendedFeesStatus401 | GetMempoolRecommendedFeesStatus404 | GetMempoolRecommendedFeesStatus409 | GetMempoolRecommendedFeesStatus413 | GetMempoolRecommendedFeesStatus500 | GetMempoolRecommendedFeesStatus504>> & { queryKey: TQueryKey }
+  } as unknown as QueryObserverOptions, queryClient) as UseQueryResult<TData, ResponseErrorConfig<Error>> & { queryKey: TQueryKey }
 
   queryResult.queryKey = queryKey as TQueryKey
 

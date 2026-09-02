@@ -40,11 +40,11 @@ import global.goldenera.wallet.api.core.v1.wallet.dtos.UnifiedTransferDtoV1.Tran
 import global.goldenera.wallet.api.core.v1.wallet.dtos.UnifiedTransferDtoV1.TransferType;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.WalletBalanceDtoV1;
 import global.goldenera.wallet.client.node.model.v1.AccountBalanceDtoV1;
-import global.goldenera.wallet.exceptions.GEFailedException;
 import global.goldenera.wallet.client.node.model.v1.FeeLevel;
 import global.goldenera.wallet.client.node.model.v1.MemTransferDtoV1;
 import global.goldenera.wallet.client.node.model.v1.RecommendedFeesDtoV1;
 import global.goldenera.wallet.client.node.model.v1.TransferDtoV1;
+import global.goldenera.wallet.exceptions.GEFailedException;
 
 /**
  * Mapper for wallet-related DTOs.
@@ -60,6 +60,13 @@ public interface WalletMapper {
             return null;
         }
         Wei total = stringToWei(source.getBalance());
+        if (source.getVersion() == null) {
+            throw new GEFailedException("Node returned an account balance without a version");
+        }
+        boolean legacy = source.getVersion() == AccountBalanceDtoV1.VersionEnum.V1;
+        if (!legacy && (source.getLockedMiningReward() == null || source.getSpendableBalance() == null)) {
+            throw new GEFailedException("Node returned an incomplete V2 account balance");
+        }
         Wei locked = source.getLockedMiningReward() == null ? Wei.ZERO : stringToWei(source.getLockedMiningReward());
         if (total == null || locked == null || locked.compareTo(total) > 0) {
             throw new GEFailedException("Node returned an invalid account balance");
@@ -70,8 +77,8 @@ public interface WalletMapper {
             throw new GEFailedException("Node returned an invalid spendable balance");
         }
         return new WalletBalanceDtoV1(stringToAddress(source.getAddress()), stringToTokenAddress(source.getTokenAddress()),
-                spendable, source.getUpdatedAtBlockHeight(), offsetDateTimeToInstant(source.getUpdatedAtTimestamp()),
-                total, locked, spendable);
+                spendable, nonNegativeLongToString(source.getUpdatedAtBlockHeight(), "balance block height"),
+                offsetDateTimeToInstant(source.getUpdatedAtTimestamp()), total, locked, spendable);
     }
 
     /**
@@ -90,7 +97,7 @@ public interface WalletMapper {
                 stringToTokenAddress(source.getTokenAddress()),
                 stringToWei(source.getAmount()),
                 stringToWei(source.getFee()),
-                source.getNonce(),
+                nonNegativeLongToString(source.getNonce(), "transaction nonce"),
                 source.getMessage(),
                 offsetDateTimeToInstant(source.getAddedAt()),
                 null,
@@ -105,9 +112,16 @@ public interface WalletMapper {
         if (source == null) {
             return null;
         }
-        Long confirmations = null;
+        String blockHeight = nonNegativeLongToString(source.getBlockHeight(), "confirmed block height");
+        String confirmations = null;
         if (currentBlockHeight != null && source.getBlockHeight() != null) {
-            confirmations = currentBlockHeight - source.getBlockHeight() + 1;
+            if (currentBlockHeight < source.getBlockHeight()) {
+                throw new GEFailedException("Node returned a block height older than a confirmed transfer");
+            }
+            confirmations = BigInteger.valueOf(currentBlockHeight)
+                    .subtract(BigInteger.valueOf(source.getBlockHeight()))
+                    .add(BigInteger.ONE)
+                    .toString();
         }
         return new UnifiedTransferDtoV1(
                 TransferStatus.CONFIRMED,
@@ -118,10 +132,10 @@ public interface WalletMapper {
                 stringToTokenAddress(source.getTokenAddress()),
                 stringToWei(source.getAmount()),
                 stringToWei(source.getFee()),
-                source.getNonce(),
+                nonNegativeLongToString(source.getNonce(), "transaction nonce"),
                 source.getMessage(),
                 offsetDateTimeToInstant(source.getTimestamp()),
-                source.getBlockHeight(),
+                blockHeight,
                 stringToHash(source.getBlockHash()),
                 confirmations);
     }
@@ -153,6 +167,16 @@ public interface WalletMapper {
     @Named("offsetDateTimeToInstant")
     default Instant offsetDateTimeToInstant(OffsetDateTime value) {
         return value != null ? value.toInstant() : null;
+    }
+
+    default String nonNegativeLongToString(Long value, String field) {
+        if (value == null) {
+            return null;
+        }
+        if (value < 0) {
+            throw new GEFailedException("Node returned a negative " + field);
+        }
+        return value.toString();
     }
 
     default TransferType mapMemTransferType(MemTransferDtoV1.TransferTypeEnum type) {
@@ -202,22 +226,40 @@ public interface WalletMapper {
 
     default MempoolRecommendedFeesLevelDtoV1 toMempoolRecommendedFeesLevelDtoV1(FeeLevel source) {
         if (source == null) {
-            return null;
+            throw new GEFailedException("Node returned a missing recommended fee level");
         }
         return new MempoolRecommendedFeesLevelDtoV1(
-                source.getBaseFee(),
-                source.getFeePerByte(),
-                source.getTotalForAverageTx());
+                requiredCanonicalUint256(source.getBaseFee(), "recommended base fee"),
+                requiredCanonicalUint256(source.getFeePerByte(), "recommended fee per byte"),
+                requiredCanonicalUint256(source.getTotalForAverageTx(), "recommended average transaction fee"));
     }
 
     default MempoolRecommendedFeesDtoV1 toMempoolRecommendedFeesDtoV1(RecommendedFeesDtoV1 source) {
         if (source == null) {
-            return null;
+            throw new GEFailedException("Node returned missing recommended fees");
         }
         return new MempoolRecommendedFeesDtoV1(
                 toMempoolRecommendedFeesLevelDtoV1(source.getSlow()),
                 toMempoolRecommendedFeesLevelDtoV1(source.getStandard()),
                 toMempoolRecommendedFeesLevelDtoV1(source.getFast()),
-                source.getMempoolSize());
+                requiredNonNegativeLongToString(source.getMempoolSize(), "mempool size"));
+    }
+
+    default String requiredCanonicalUint256(String value, String field) {
+        if (value == null || value.length() > 78 || !value.matches("^(0|[1-9][0-9]*)$")) {
+            throw new GEFailedException("Node returned an invalid " + field);
+        }
+        BigInteger parsed = new BigInteger(value);
+        if (parsed.compareTo(BigInteger.ONE.shiftLeft(256).subtract(BigInteger.ONE)) > 0) {
+            throw new GEFailedException("Node returned an invalid " + field);
+        }
+        return value;
+    }
+
+    default String requiredNonNegativeLongToString(Long value, String field) {
+        if (value == null || value < 0) {
+            throw new GEFailedException("Node returned an invalid " + field);
+        }
+        return value.toString();
     }
 }

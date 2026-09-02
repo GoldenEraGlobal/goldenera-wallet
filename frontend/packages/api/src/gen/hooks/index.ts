@@ -10,6 +10,8 @@ export { getTokenByAddressQueryKey, getTokenByAddressQueryOptions, useGetTokenBy
 export { getTokenByAddressSuspenseQueryKey, getTokenByAddressSuspenseQueryOptions, useGetTokenByAddressSuspenseHook } from './walletAPIV1/useGetTokenByAddressSuspenseHook'
 export { getTokensQueryKey, getTokensQueryOptions, useGetTokensHook } from './walletAPIV1/useGetTokensHook'
 export { getTokensSuspenseQueryKey, getTokensSuspenseQueryOptions, useGetTokensSuspenseHook } from './walletAPIV1/useGetTokensSuspenseHook'
+export { getTransactionStatusQueryKey, getTransactionStatusQueryOptions, useGetTransactionStatusHook } from './walletAPIV1/useGetTransactionStatusHook'
+export { getTransactionStatusSuspenseQueryKey, getTransactionStatusSuspenseQueryOptions, useGetTransactionStatusSuspenseHook } from './walletAPIV1/useGetTransactionStatusSuspenseHook'
 export { getTransfersQueryKey, getTransfersQueryOptions, useGetTransfersHook } from './walletAPIV1/useGetTransfersHook'
 export { getTransfersSuspenseQueryKey, getTransfersSuspenseQueryOptions, useGetTransfersSuspenseHook } from './walletAPIV1/useGetTransfersSuspenseHook'
 export { submitTransactionMutationKey, submitTransactionMutationOptions, useSubmitTransactionHook } from './walletAPIV1/useSubmitTransactionHook'

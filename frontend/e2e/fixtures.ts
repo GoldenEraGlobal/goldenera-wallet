@@ -38,6 +38,15 @@ export const test = base.extend<{ api: MockApi }>({
         return
       }
       api.requested.push(url.pathname)
+      if (url.pathname.endsWith('/device/register')) {
+        api.unexpected.push(url.pathname)
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'The retired PWA must not attempt device registration' }),
+        })
+        return
+      }
       if (backendOrigin) {
         if (url.pathname.endsWith('/wallet/submit-tx')) api.submitted.push(route.request().postDataJSON() as { hexData: string })
         const response = await route.fetch({ url: new URL(url.pathname + url.search, backendOrigin).href })
@@ -45,21 +54,23 @@ export const test = base.extend<{ api: MockApi }>({
         return
       }
       const reply = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-      if (url.pathname.endsWith('/device/register')) return reply({ id: '00000000-0000-4000-8000-000000000001' })
       if (url.pathname.endsWith('/wallet/tokens')) return reply(tokens)
       if (url.pathname.endsWith('/wallet/token')) {
         return reply(tokens.find(token => token.address === url.searchParams.get('address')) ?? tokens[0])
       }
       if (url.pathname.endsWith('/wallet/balances')) {
-        return reply(tokens.map((token, index) => ({ address: PUBLIC_ADDRESS, tokenAddress: token.address, balance: index === 0 ? '100000000000' : index === 1 ? '100' : '100000000000000000000', pending: '0' })))
+        return reply(tokens.map((token, index) => {
+          const holdings = index === 0 ? '100000000000' : index === 1 ? '100' : '100000000000000000000'
+          return { address: PUBLIC_ADDRESS, tokenAddress: token.address, balance: holdings, totalBalance: holdings, pending: '0' }
+        }))
       }
-      if (url.pathname.endsWith('/wallet/next-nonce')) return reply(api.submitted.length + 1)
+      if (url.pathname.endsWith('/wallet/next-nonce')) return reply(String(api.submitted.length + 1))
       if (url.pathname.endsWith('/wallet/mempool-recommended-fees')) {
         const fee = { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' }
         return reply({ fast: fee, standard: fee, slow: fee })
       }
       if (url.pathname.endsWith('/wallet/transfers')) {
-        return reply({ content: [{ status: 'CONFIRMED', txHash: `0x${'11'.repeat(32)}`, transferType: 'TRANSFER', from: RECIPIENT, to: PUBLIC_ADDRESS, tokenAddress: NATIVE_TOKEN, amount: '100000000', fee: '2500', nonce: 1, timestamp: '2026-08-31T12:00:00Z', confirmations: 10 }], pageNumber: 0, pageSize: 15, totalPages: 1, totalElements: 1, pendingCount: 0, first: true, last: true })
+        return reply({ content: [{ status: 'CONFIRMED', txHash: `0x${'11'.repeat(32)}`, transferType: 'TRANSFER', from: RECIPIENT, to: PUBLIC_ADDRESS, tokenAddress: NATIVE_TOKEN, amount: '100000000', fee: '2500', nonce: '1', timestamp: '2026-08-31T12:00:00Z', confirmations: '10' }], pageNumber: 0, pageSize: 15, totalPages: 1, totalElements: '1', pendingCount: '0', confirmedCount: '1', first: true, last: true })
       }
       if (url.pathname.endsWith('/wallet/submit-tx')) {
         api.submitted.push(route.request().postDataJSON() as { hexData: string })
@@ -73,13 +84,21 @@ export const test = base.extend<{ api: MockApi }>({
   }, { auto: true }],
 })
 
-export async function importPublicWallet(page: Page, initialURL = '/') {
+export async function importPublicWallet(
+  page: Page,
+  initialURL = '/',
+  enableBiometric = true,
+) {
   await page.goto(initialURL)
   await page.getByRole('button', { name: 'Import Wallet', exact: true }).click()
   await page.getByPlaceholder('Enter your recovery phrase...').fill(PUBLIC_MNEMONIC)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
   await page.getByPlaceholder('Confirm your password', { exact: true }).fill(TEST_PASSWORD)
+  if (!enableBiometric) {
+    const biometricToggle = page.getByRole('switch', { name: 'Enable Biometric' })
+    if (await biometricToggle.isChecked()) await biometricToggle.click()
+  }
   await page.getByRole('button', { name: 'Import Wallet', exact: true }).click()
   await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
 }

@@ -31,6 +31,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import global.goldenera.cryptoj.datatypes.Address;
 import global.goldenera.cryptoj.datatypes.Hash;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Unified transfer DTO that combines both pending (mempool) and confirmed
@@ -55,18 +56,21 @@ public record UnifiedTransferDtoV1(
         Wei amount,
         /** Transaction fee */
         Wei fee,
-        /** Transaction nonce */
-        Long nonce,
+        /** Canonical non-negative decimal transaction nonce */
+        @Schema(description = "Canonical non-negative decimal transaction nonce", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String nonce,
         /** Message attached to transfer */
         String message,
         /** Timestamp - addedAt for pending, block timestamp for confirmed */
         Instant timestamp,
-        /** Block height (only for confirmed) */
-        Long blockHeight,
+        /** Canonical non-negative decimal block height (only for confirmed) */
+        @Schema(description = "Canonical non-negative decimal block height", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String blockHeight,
         /** Block hash (only for confirmed) */
         Hash blockHash,
-        /** Number of confirmations (only for confirmed) */
-        Long confirmations) {
+        /** Canonical non-negative decimal confirmation count (only for confirmed) */
+        @Schema(description = "Canonical non-negative decimal confirmation count", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String confirmations) {
 
     public enum TransferStatus {
         PENDING, CONFIRMED

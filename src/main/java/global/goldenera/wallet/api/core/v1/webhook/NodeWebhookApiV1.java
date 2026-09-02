@@ -27,7 +27,6 @@ import static lombok.AccessLevel.PRIVATE;
 
 import java.util.List;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,7 +42,7 @@ import global.goldenera.wallet.api.core.v1.webhook.dtos.WebhookEventDtoV1;
 import global.goldenera.wallet.client.node.model.v1.BlockchainBlockHeaderDtoV1;
 import global.goldenera.wallet.client.node.model.v1.BlockchainTxDtoV1;
 import global.goldenera.wallet.components.WebhookSignatureVerifier;
-import global.goldenera.wallet.exceptions.GERuntimeException;
+import global.goldenera.wallet.exceptions.MalformedRequestException;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -63,20 +62,32 @@ public class NodeWebhookApiV1 {
             @RequestHeader(value = "X-Webhook-Timestamp") String timestamp,
             @RequestHeader(value = "X-Webhook-Signature") String signature,
             @RequestBody byte[] rawBody) {
+        webhookSignatureVerifier.verify(rawBody, timestamp, signature);
         try {
-            webhookSignatureVerifier.verify(rawBody, timestamp, signature);
-
             List<WebhookEventDtoV1> events = objectMapper.readValue(rawBody, new TypeReference<>() {
             });
+            if (events == null || events.stream().anyMatch(this::isInvalidEvent)) {
+                throw new MalformedRequestException("Webhook request body is incomplete");
+            }
             events.forEach(this::handleEvent);
             return ResponseEntity.ok("Processed");
-        } catch (GERuntimeException e) {
-            log.warn("Security check failed: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid signature");
-        } catch (JacksonException e) {
-            log.error("Deserialization failed", e);
-            return ResponseEntity.badRequest().body("Invalid JSON structure");
+        } catch (JacksonException exception) {
+            log.warn("Webhook deserialization failed: {}", exception.getClass().getSimpleName());
+            throw new MalformedRequestException("Webhook request body is malformed", exception);
         }
+    }
+
+    private boolean isInvalidEvent(WebhookEventDtoV1 event) {
+        if (event == null || event.type() == null || event.source() == null) {
+            return true;
+        }
+        return switch (event) {
+            case WebhookEventDtoV1.NewBlockEvent newBlock -> newBlock.data() == null;
+            case WebhookEventDtoV1.AddressActivityEvent activity ->
+                    activity.data() == null || activity.status() == null;
+            case WebhookEventDtoV1.ReorgEvent reorg -> reorg.oldHeight() == null || reorg.oldHash() == null
+                    || reorg.newHeight() == null || reorg.newHash() == null;
+        };
     }
 
     private void handleEvent(WebhookEventDtoV1 event) {

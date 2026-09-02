@@ -8,20 +8,6 @@ import type { TxSubmitDtoV1 } from './TxSubmitDtoV1'
 
 export type SubmitTransactionStatus200 = MempoolResult;
 
-export type SubmitTransactionStatus400 = string;
-
-export type SubmitTransactionStatus401 = string;
-
-export type SubmitTransactionStatus404 = string;
-
-export type SubmitTransactionStatus409 = string;
-
-export type SubmitTransactionStatus413 = string;
-
-export type SubmitTransactionStatus500 = string;
-
-export type SubmitTransactionStatus504 = string;
-
 /**
  * @description Transaction details
  * @type object
@@ -37,16 +23,9 @@ export type SubmitTransactionOptions = {
 
 export type SubmitTransactionResponses = {
     "200": SubmitTransactionStatus200;
-    "400": SubmitTransactionStatus400;
-    "401": SubmitTransactionStatus401;
-    "404": SubmitTransactionStatus404;
-    "409": SubmitTransactionStatus409;
-    "413": SubmitTransactionStatus413;
-    "500": SubmitTransactionStatus500;
-    "504": SubmitTransactionStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type SubmitTransactionResponse = (SubmitTransactionStatus200 | SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504);
+export type SubmitTransactionResponse = SubmitTransactionStatus200;

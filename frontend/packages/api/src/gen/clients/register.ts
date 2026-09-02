@@ -8,8 +8,8 @@ import type { RegisterOptions, RegisterResponses } from '../models/Register'
 import { client } from '../.kubb/client'
 
 /**
- * @description Register a new device or update existing one
- * @summary Register device
+ * @description Rolling-retirement endpoint; persistence remains configurable until old backend replicas drain
+ * @summary Acknowledge legacy device registration
  * {@link /api/core/v1/device/register}
  */
 export function register<ThrowOnError extends boolean = true>(options: Options<RegisterOptions, ThrowOnError>): Promise<RequestResult<RegisterResponses, ThrowOnError>> {

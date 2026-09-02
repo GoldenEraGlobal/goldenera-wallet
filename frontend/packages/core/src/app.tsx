@@ -4,6 +4,8 @@ import '@stackflow/plugin-basic-ui/index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import 'barcode-detector/polyfill'
 import { PwaInstallDialog } from './components/pwa-install-dialog/PwaInstallDialog'
+import { TransferJournalRecoveryNotice } from './components/TransferJournalRecoveryNotice'
+import { TransferReconciliationLifecycle } from './components/TransferReconciliationLifecycle'
 import { Stack } from './router/stackflow'
 import { StorageService } from './services/StorageService'
 import { useWalletStore } from './store/WalletStore'
@@ -39,6 +41,8 @@ export const createApp = async ({ isExtension = false }: CreateAppOptions = {}):
                     storageKey="ui-theme"
                     storage={StorageService.basic}
                 >
+                    <TransferReconciliationLifecycle />
+                    <TransferJournalRecoveryNotice />
                     <Stack />
                     <PwaInstallDialog />
                 </ThemeProvider>

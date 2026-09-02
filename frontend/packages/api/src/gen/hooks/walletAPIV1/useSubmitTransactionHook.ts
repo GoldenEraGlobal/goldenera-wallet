@@ -4,7 +4,7 @@
 */
 
 import type { RequestConfig, ResponseErrorConfig } from '../../.kubb/client'
-import type { SubmitTransactionOptions, SubmitTransactionStatus200, SubmitTransactionStatus400, SubmitTransactionStatus401, SubmitTransactionStatus404, SubmitTransactionStatus409, SubmitTransactionStatus413, SubmitTransactionStatus500, SubmitTransactionStatus504 } from '../../models/SubmitTransaction'
+import type { SubmitTransactionOptions, SubmitTransactionStatus200 } from '../../models/SubmitTransaction'
 import type { UseMutationOptions, UseMutationResult, QueryClient } from '@tanstack/react-query'
 import { submitTransaction } from '../../clients/submitTransaction'
 import { mutationOptions, useMutation } from '@tanstack/react-query'
@@ -13,7 +13,7 @@ export const submitTransactionMutationKey = () => [{ url: '/api/core/v1/wallet/s
 
 export function submitTransactionMutationOptions<TContext = unknown>(config: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>> = {}) {
   const mutationKey = submitTransactionMutationKey()
-  return mutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504>, SubmitTransactionOptions, TContext>({
+  return mutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<Error>, SubmitTransactionOptions, TContext>({
     mutationKey,
     mutationFn: async({ body }) => {
       const { data } = await submitTransaction({ ...config, body, throwOnError: true })
@@ -28,18 +28,18 @@ export function submitTransactionMutationOptions<TContext = unknown>(config: Par
  * {@link /api/core/v1/wallet/submit-tx}
  */
 export function useSubmitTransactionHook<TContext>(options: {
-  mutation?: UseMutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504>, SubmitTransactionOptions, TContext> & { client?: QueryClient },
+  mutation?: UseMutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<Error>, SubmitTransactionOptions, TContext> & { client?: QueryClient },
   client?: Partial<Omit<RequestConfig, 'path' | 'query' | 'body' | 'headers' | 'url'>>,
 } = {}) {
   const { mutation = {}, client: config = {} } = options ?? {}
   const { client: queryClient, ...mutationOptions } = mutation;
   const mutationKey = mutationOptions.mutationKey ?? submitTransactionMutationKey()
 
-  const baseOptions = submitTransactionMutationOptions(config) as UseMutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504>, SubmitTransactionOptions, TContext>
+  const baseOptions = submitTransactionMutationOptions(config) as UseMutationOptions<SubmitTransactionStatus200, ResponseErrorConfig<Error>, SubmitTransactionOptions, TContext>
 
-  return useMutation<SubmitTransactionStatus200, ResponseErrorConfig<SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504>, SubmitTransactionOptions, TContext>({
+  return useMutation<SubmitTransactionStatus200, ResponseErrorConfig<Error>, SubmitTransactionOptions, TContext>({
     ...baseOptions,
     mutationKey,
     ...mutationOptions,
-  }, queryClient) as UseMutationResult<SubmitTransactionStatus200, ResponseErrorConfig<SubmitTransactionStatus400 | SubmitTransactionStatus401 | SubmitTransactionStatus404 | SubmitTransactionStatus409 | SubmitTransactionStatus413 | SubmitTransactionStatus500 | SubmitTransactionStatus504>, SubmitTransactionOptions, TContext>
+  }, queryClient) as UseMutationResult<SubmitTransactionStatus200, ResponseErrorConfig<Error>, SubmitTransactionOptions, TContext>
 }

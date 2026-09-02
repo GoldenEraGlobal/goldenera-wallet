@@ -51,20 +51,6 @@ export type GetTransfersQuery = {
 
 export type GetTransfersStatus200 = UnifiedTransferPageDtoV1;
 
-export type GetTransfersStatus400 = string;
-
-export type GetTransfersStatus401 = string;
-
-export type GetTransfersStatus404 = string;
-
-export type GetTransfersStatus409 = string;
-
-export type GetTransfersStatus413 = string;
-
-export type GetTransfersStatus500 = string;
-
-export type GetTransfersStatus504 = string;
-
 export type GetTransfersOptions = {
     body?: never;
     path?: never;
@@ -74,16 +60,9 @@ export type GetTransfersOptions = {
 
 export type GetTransfersResponses = {
     "200": GetTransfersStatus200;
-    "400": GetTransfersStatus400;
-    "401": GetTransfersStatus401;
-    "404": GetTransfersStatus404;
-    "409": GetTransfersStatus409;
-    "413": GetTransfersStatus413;
-    "500": GetTransfersStatus500;
-    "504": GetTransfersStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type GetTransfersResponse = (GetTransfersStatus200 | GetTransfersStatus400 | GetTransfersStatus401 | GetTransfersStatus404 | GetTransfersStatus409 | GetTransfersStatus413 | GetTransfersStatus500 | GetTransfersStatus504);
+export type GetTransfersResponse = GetTransfersStatus200;

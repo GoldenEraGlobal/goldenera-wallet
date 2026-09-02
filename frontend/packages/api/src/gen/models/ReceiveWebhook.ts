@@ -10,20 +10,6 @@ export type ReceiveWebhookHeaders = {
 
 export type ReceiveWebhookStatus200 = string;
 
-export type ReceiveWebhookStatus400 = string;
-
-export type ReceiveWebhookStatus401 = string;
-
-export type ReceiveWebhookStatus404 = string;
-
-export type ReceiveWebhookStatus409 = string;
-
-export type ReceiveWebhookStatus413 = string;
-
-export type ReceiveWebhookStatus500 = string;
-
-export type ReceiveWebhookStatus504 = string;
-
 /**
  * @description
  * Format: `byte`
@@ -40,16 +26,9 @@ export type ReceiveWebhookOptions = {
 
 export type ReceiveWebhookResponses = {
     "200": ReceiveWebhookStatus200;
-    "400": ReceiveWebhookStatus400;
-    "401": ReceiveWebhookStatus401;
-    "404": ReceiveWebhookStatus404;
-    "409": ReceiveWebhookStatus409;
-    "413": ReceiveWebhookStatus413;
-    "500": ReceiveWebhookStatus500;
-    "504": ReceiveWebhookStatus504;
 };
 
 /**
  * @description Union of all possible responses
 */
-export type ReceiveWebhookResponse = (ReceiveWebhookStatus200 | ReceiveWebhookStatus400 | ReceiveWebhookStatus401 | ReceiveWebhookStatus404 | ReceiveWebhookStatus409 | ReceiveWebhookStatus413 | ReceiveWebhookStatus500 | ReceiveWebhookStatus504);
+export type ReceiveWebhookResponse = ReceiveWebhookStatus200;

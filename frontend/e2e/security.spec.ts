@@ -9,6 +9,39 @@ const prfKey = 'CapacitorStorage.ge_basic:biometric_prf_v2'
 const legacyIdKey = 'CapacitorStorage.ge_basic:biometric_credential_id'
 const legacyPasswordKey = 'CapacitorStorage.ge_basic:biometric_encrypted_password'
 
+test('recovery phrase input disables browser text-assistance features', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Import Wallet', exact: true }).click()
+  const phrase = page.getByPlaceholder('Enter your recovery phrase...')
+  await expect(phrase).toHaveAttribute('autocomplete', 'off')
+  await expect(phrase).toHaveAttribute('autocapitalize', 'none')
+  await expect(phrase).toHaveAttribute('autocorrect', 'off')
+  await expect(phrase).toHaveAttribute('spellcheck', 'false')
+})
+
+test('browser Back and Forward never cross locked and authenticated realms', async ({ page }) => {
+  await importPublicWallet(page)
+  await openSettings(page)
+  await page.getByRole('button', { name: /Lock Wallet/ }).click()
+  await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
+
+  await page.goBack()
+  await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
+  await expect(page.getByText('Security', { exact: true })).toHaveCount(0)
+  await page.goForward()
+  await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
+
+  await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+
+  await page.goBack()
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+  await expect(page.getByText('Welcome Back', { exact: true })).toHaveCount(0)
+  await page.goForward()
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+})
+
 test('locking one tab invalidates another unlocked tab', async ({ page, context }) => {
   await importPublicWallet(page)
   const second = await context.newPage()
@@ -45,8 +78,13 @@ test('storage enumeration failure never opens onboarding over a legacy vault', a
   expect(await page.evaluate(key => atob(localStorage.getItem(key)!), vaultKey)).toBe(golden.vaults[0].encrypted)
 })
 
-test('failed physical deletion keeps a retryable error and does not report a removed wallet', async ({ page }) => {
+test.describe('wallet deletion storage failure', () => {
+  test.use({ serviceWorkers: 'allow' })
+
+  test('failed physical deletion keeps a retryable error and does not report a removed wallet', async ({ page }) => {
   await importPublicWallet(page)
+  await page.evaluate(async () => { await navigator.serviceWorker.ready })
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
   await page.evaluate(key => {
     const remove = Storage.prototype.removeItem
     Storage.prototype.removeItem = function (item) {
@@ -64,6 +102,7 @@ test('failed physical deletion keeps a retryable error and does not report a rem
   await expect(page.getByText('Wallet storage unavailable', { exact: true })).toBeVisible()
   expect(await page.evaluate(key => localStorage.getItem(key), vaultKey)).not.toBeNull()
   await expect(page.getByRole('button', { name: 'Create New Wallet', exact: true })).toHaveCount(0)
+  })
 })
 
 test('PRF enrollment and unlock work through the browser API fixture', async ({ page, context }, testInfo) => {
@@ -139,7 +178,9 @@ test('legacy biometric recovery requires verification and persists a new passwor
   await page.getByRole('button', { name: /View Recovery Phrase Backup/ }).click()
   await page.getByPlaceholder('Enter your password', { exact: true }).fill(newPassword)
   await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  await page.getByRole('button', { name: 'Show', exact: true }).click()
   await expect(page.getByText(PUBLIC_MNEMONIC.split(' ').at(-1)!, { exact: true })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Copy', exact: true })).toHaveCount(0)
 })
 
 test('password unlock upgrades existing legacy biometric intent to PRF', async ({ page, context }, testInfo) => {
@@ -167,7 +208,7 @@ test('password unlock continues with a visible warning when legacy biometric PRF
   await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
   await page.getByRole('button', { name: 'Unlock', exact: true }).click()
   await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Older biometric access was retired, but secure biometric enrollment did not finish/)).toBeVisible()
+  await expect(page.getByText(/Older biometric access was retired safely, but secure biometric enrollment did not finish because it was cancelled or unavailable/)).toBeVisible()
   expect(await page.evaluate(key => localStorage.getItem(key), legacyPasswordKey)).toBeNull()
   expect(await page.evaluate(key => localStorage.getItem(key), prfKey)).toBeNull()
 })
@@ -182,10 +223,13 @@ test('post-commit legacy recovery enrollment failure clears sensitive migration 
   await page.getByPlaceholder('Confirm new wallet password', { exact: true }).fill(newPassword)
   await page.getByRole('button', { name: 'Save new password and upgrade biometrics', exact: true }).click()
 
-  await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Your wallet password was upgraded, but secure biometric enrollment did not finish/)).toBeVisible()
+  await expect(page.getByText(/Your new password is saved and older biometric access was retired\. Secure biometric enrollment was cancelled or unavailable/)).toBeVisible()
   await expect(page.getByPlaceholder('New wallet password', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Save new password and upgrade biometrics', exact: true })).toHaveCount(0)
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
   await page.getByPlaceholder('Enter your password', { exact: true }).fill(newPassword)
   await page.getByRole('button', { name: 'Unlock', exact: true }).click()
   await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
@@ -219,10 +263,17 @@ test('legacy recovery secrets expire on resume and require fresh user verificati
 })
 
 
-test('delete and import in another tab cannot leave an old signing session active', async ({ page, context }) => {
+test.describe('wallet deletion session fencing', () => {
+  test.use({ serviceWorkers: 'allow' })
+
+  test('delete and import in another tab cannot leave an old signing session active', async ({ page, context }) => {
   await importPublicWallet(page)
+  await page.evaluate(async () => { await navigator.serviceWorker.ready })
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
   const second = await context.newPage()
   await second.goto('/')
+  await second.evaluate(async () => { await navigator.serviceWorker.ready })
+  await second.waitForFunction(() => navigator.serviceWorker.controller !== null)
   await second.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
   await second.getByRole('button', { name: 'Unlock', exact: true }).click()
   await expect(second.getByText('Your Tokens', { exact: true })).toBeVisible()
@@ -247,4 +298,5 @@ test('delete and import in another tab cannot leave an old signing session activ
   await page.getByRole('button', { name: 'Unlock', exact: true }).click()
   const replacementAddress = golden.seeds[1].address
   await expect(page.getByText(`${replacementAddress.slice(0, 8)}...${replacementAddress.slice(-6)}`, { exact: true })).toBeVisible()
+  })
 })

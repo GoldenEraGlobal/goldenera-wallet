@@ -2,10 +2,13 @@ import { NATIVE_TOKEN } from '@goldenera/cryptoj'
 import type {
     GetTransfersTransferTypeKey} from '@project/api'
 import {
+    normalizeApiInteger,
     useGetTransfersHook,
     type UnifiedTransferDtoV1,
 } from '@project/api'
 import {
+    Alert,
+    AlertDescription,
     Badge,
     Empty,
     EmptyDescription,
@@ -27,8 +30,8 @@ import {
     useOnRefresh
 } from '@project/ui'
 import { keepPreviousData } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowUpRight, Clock, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertCircle, ArrowDownLeft, ArrowUpRight, Clock, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import scrollIntoView from 'scroll-into-view-if-needed'
 import { useWalletStore } from '../store/WalletStore'
 import { formatTransferType, formatWei } from '../utils/WalletUtil'
@@ -62,6 +65,49 @@ interface TransferListProps {
     tokenDecimals?: number
     pageSize?: number
     transferType?: GetTransfersTransferTypeKey
+}
+
+interface TransferPageMetadata {
+    content: UnifiedTransferDtoV1[]
+    totalPages: number
+    totalElements: string
+    pendingCount: string
+    confirmedCount: string
+}
+
+const parseTransferPageMetadata = (value: unknown): TransferPageMetadata => {
+    if (!value || typeof value !== 'object') throw new TypeError('Transfer page is missing')
+    const page = value as Record<string, unknown>
+    if (!Array.isArray(page.content)) throw new TypeError('Transfer page content is missing')
+    if (typeof page.totalPages !== 'number' || !Number.isSafeInteger(page.totalPages) || page.totalPages < 0) {
+        throw new TypeError('totalPages must be a non-negative safe integer')
+    }
+    const totalElements = normalizeApiInteger(page.totalElements, 'totalElements')
+    const pendingCount = normalizeApiInteger(page.pendingCount, 'pendingCount')
+    const confirmedCount = normalizeApiInteger(page.confirmedCount, 'confirmedCount')
+    if (BigInt(pendingCount) + BigInt(confirmedCount) !== BigInt(totalElements)) {
+        throw new TypeError('Transfer page counts are inconsistent')
+    }
+    if (page.totalPages === 0 && totalElements !== '0') {
+        throw new TypeError('Transfer page count is inconsistent')
+    }
+    return {
+        content: page.content as UnifiedTransferDtoV1[],
+        totalPages: page.totalPages,
+        totalElements,
+        pendingCount,
+        confirmedCount,
+    }
+}
+
+const transferPollingInterval = (value: unknown): number | false => {
+    if (value == null) return 30_000
+    try {
+        const { pendingCount } = parseTransferPageMetadata(value)
+        return BigInt(pendingCount) > 0n ? 15_000 : 60_000
+    } catch {
+        return false
+    }
 }
 
 type TransferDirection = 'received' | 'sent' | 'self'
@@ -168,7 +214,13 @@ function TransferListPage({
     const [openedTransfer, setOpenedTransfer] = useState<UnifiedTransferDtoV1 | null>(null)
 
     // Fetch transfers
-    const { data: transfersPage, isLoading, isPlaceholderData, refetch } = useGetTransfersHook(
+    const {
+        data: transfersPage,
+        isLoading,
+        isError,
+        isPlaceholderData,
+        refetch,
+    } = useGetTransfersHook(
         { query: {
             addresses: address ? [address] : [],
             tokenAddresses: [tokenAddress],
@@ -180,7 +232,7 @@ function TransferListPage({
             query: {
                 enabled: !!address,
                 placeholderData: keepPreviousData,
-                refetchInterval: 5000
+                refetchInterval: query => transferPollingInterval(query.state.data)
             },
         }
     )
@@ -192,14 +244,23 @@ function TransferListPage({
 
     useOnRefresh(handleRefresh)
 
-    const transfers = transfersPage?.content || []
-    const totalPages = transfersPage?.totalPages || 0
-    const totalElements = transfersPage?.totalElements || 0
-    const pendingCount = transfersPage?.pendingCount || 0
+    const parsedPage = useMemo(() => {
+        if (!transfersPage) return { metadata: null, malformed: false }
+        try {
+            return { metadata: parseTransferPageMetadata(transfersPage), malformed: false }
+        } catch {
+            return { metadata: null, malformed: true }
+        }
+    }, [transfersPage])
+    const transfers = parsedPage.metadata?.content ?? []
+    const totalPages = parsedPage.metadata?.totalPages ?? 0
+    const totalElements = parsedPage.metadata?.totalElements
+    const pendingCount = parsedPage.metadata?.pendingCount
+    const responseError = isError || parsedPage.malformed
 
     // Polling may shrink the result set while the user is on a later page.
     const lastPage = Math.max(0, totalPages - 1)
-    const isOutOfRange = !isPlaceholderData && !!transfersPage && pageNumber > lastPage
+    const isOutOfRange = !isPlaceholderData && !!parsedPage.metadata && pageNumber > lastPage
     useEffect(() => {
         if (isOutOfRange) setPageNumber(lastPage)
     }, [isOutOfRange, lastPage])
@@ -233,17 +294,28 @@ function TransferListPage({
             <div className="flex items-center justify-between px-1" ref={topEl}>
                 <h3 className="font-semibold text-sm">Transfer History</h3>
                 <div className="flex items-center gap-2">
-                    {pendingCount > 0 && (
+                    {pendingCount && pendingCount !== '0' && (
                         <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-600/30">
                             {pendingCount} pending
                         </Badge>
                     )}
-                    <Badge variant="outline" className="text-xs">
-                        {totalElements} total
-                    </Badge>
+                    {totalElements && (
+                        <Badge variant="outline" className="text-xs">
+                            {totalElements} total
+                        </Badge>
+                    )}
                 </div>
             </div>
 
+
+            {responseError && (
+                <Alert variant="destructive">
+                    <AlertCircle />
+                    <AlertDescription>
+                        Transfer history could not be refreshed. Check your connection and retry.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {isLoading || isOutOfRange ? (
                 <ItemGroup className="gap-4">
@@ -251,7 +323,7 @@ function TransferListPage({
                         <Skeleton key={i} className="h-16" />
                     ))}
                 </ItemGroup>
-            ) : transfers.length === 0 ? (
+            ) : transfers.length === 0 && !responseError ? (
                 <Empty className="border border-dashed">
                     <EmptyHeader>
                         <EmptyMedia variant="icon">

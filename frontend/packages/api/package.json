@@ -14,6 +14,14 @@
     "./client": {
       "import": "./src/client.ts",
       "types": "./src/client.ts"
+    },
+    "./errors": {
+      "import": "./src/errors.ts",
+      "types": "./src/errors.ts"
+    },
+    "./integers": {
+      "import": "./src/integers.ts",
+      "types": "./src/integers.ts"
     }
   },
   "scripts": {

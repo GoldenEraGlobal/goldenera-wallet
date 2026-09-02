@@ -34,7 +34,7 @@ test('Chromium virtual authenticator executes real WebAuthn PRF enrollment and u
     await page.getByRole('button', { name: /Lock Wallet/ }).click()
     await cdp.send('WebAuthn.setResponseOverrideBits', { authenticatorId, isBadUV: true })
     await page.getByRole('button', { name: 'Use Biometrics', exact: true }).click()
-    await expect(page.getByText('Biometric authentication cancelled', { exact: true })).toBeVisible()
+    await expect(page.getByText('Biometric authentication failed. Use your password.', { exact: true })).toBeVisible()
     await expect(page.getByText('Welcome Back', { exact: true })).toBeVisible()
     await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
     await page.getByRole('button', { name: 'Unlock', exact: true }).click()
@@ -55,7 +55,7 @@ test('Chromium authenticator without PRF keeps the password-only fallback', asyn
     hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: false,
   } })
   try {
-    await importPublicWallet(page)
+    await importPublicWallet(page, '/', false)
     await openSettings(page)
     await page.getByRole('button', { name: /Lock Wallet/ }).click()
     expect(await page.evaluate(key => localStorage.getItem(key), wrapperKey)).toBeNull()

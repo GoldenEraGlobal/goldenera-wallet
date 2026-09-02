@@ -25,6 +25,8 @@ package global.goldenera.wallet.api.core.v1.wallet.dtos;
 
 import java.util.List;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Paginated response for unified transfers.
  * Contains both pending and confirmed transfers in a single list.
@@ -36,14 +38,17 @@ public record UnifiedTransferPageDtoV1(
         int pageNumber,
         /** Page size */
         int pageSize,
-        /** Total number of elements (pending + confirmed) */
-        long totalElements,
+        /** Canonical non-negative decimal total (pending + confirmed) */
+        @Schema(description = "Canonical non-negative decimal total transfer count", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String totalElements,
         /** Total number of pages */
         int totalPages,
-        /** Number of pending transfers in total */
-        long pendingCount,
-        /** Number of confirmed transfers in total */
-        long confirmedCount,
+        /** Canonical non-negative decimal pending transfer count */
+        @Schema(description = "Canonical non-negative decimal pending transfer count", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String pendingCount,
+        /** Canonical non-negative decimal confirmed transfer count */
+        @Schema(description = "Canonical non-negative decimal confirmed transfer count", type = "string",
+                pattern = "^(0|[1-9][0-9]*)$") String confirmedCount,
         /** Whether this is the first page */
         boolean first,
         /** Whether this is the last page */

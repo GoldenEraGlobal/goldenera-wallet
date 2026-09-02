@@ -4,7 +4,25 @@
 */
 
 export type MempoolRecommendedFeesLevelDtoV1 = {
-    baseFee?: string;
-    feePerByte?: string;
-    totalForAverageTx?: string;
+    /**
+     * @minLength 0
+     * @maxLength 78
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
+    */
+    baseFee: string;
+    /**
+     * @minLength 0
+     * @maxLength 78
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
+    */
+    feePerByte: string;
+    /**
+     * @minLength 0
+     * @maxLength 78
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
+    */
+    totalForAverageTx: string;
 };

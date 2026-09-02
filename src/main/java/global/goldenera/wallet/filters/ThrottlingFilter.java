@@ -29,20 +29,22 @@ import java.io.IOException;
 
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import global.goldenera.wallet.service.system.ApiErrorResponseWriter;
+import global.goldenera.wallet.service.system.CoreRoutePolicyRegistry;
 import global.goldenera.wallet.service.system.ThrottlingService;
+import global.goldenera.wallet.service.system.ThrottlingService.RateLimitDecision;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 @FieldDefaults(level = PRIVATE, makeFinal = true)
@@ -50,36 +52,55 @@ import lombok.extern.slf4j.Slf4j;
 public class ThrottlingFilter extends OncePerRequestFilter {
 
     ThrottlingService throttlingService;
+    CoreRoutePolicyRegistry routePolicies;
+    ApiErrorResponseWriter apiErrors;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (!throttlingService.checkGlobalIpLimit(request)) {
-            sendErrorResponse(response, "Global Rate Limit Exceeded. You are sending too many requests.");
-            return;
-        }
-
         String path;
         try {
             path = throttlingService.getRequestPath(request);
         } catch (IllegalArgumentException exception) {
-            response.sendError(HttpStatus.BAD_REQUEST.value(), "Invalid request path");
+            apiErrors.write(response, HttpStatus.BAD_REQUEST, "INVALID_REQUEST_PATH", "The request path is invalid.");
             return;
         }
+
+        RateLimitDecision globalDecision = throttlingService.checkGlobalIpLimitDecision(request);
+        if (!globalDecision.allowed()) {
+            rejectRateLimit(response, "GLOBAL_RATE_LIMITED", "Too many requests.",
+                    globalDecision.retryAfterSeconds());
+            return;
+        }
+
         if (path.startsWith("/api")) {
-            String limitKey = request.getRemoteAddr();
-            if (!throttlingService.checkSpecificLimit(request, limitKey)) {
-                sendErrorResponse(response, "Rate Limit Exceeded.");
+            RateLimitDecision apiDecision = throttlingService.checkSpecificLimitDecision(request,
+                    request.getRemoteAddr());
+            if (!apiDecision.allowed()) {
+                rejectRateLimit(response, "RATE_LIMITED", "The API rate limit was exceeded.",
+                        apiDecision.retryAfterSeconds());
+                return;
+            }
+        }
+
+        if (routePolicies.isCorePath(path)) {
+            if (!routePolicies.isKnownPath(path)) {
+                apiErrors.write(response, HttpStatus.NOT_FOUND, "ROUTE_NOT_FOUND", "The requested API route does not exist.");
+                return;
+            }
+            if (routePolicies.find(path, request.getMethod()).isEmpty()) {
+                response.setHeader(HttpHeaders.ALLOW, String.join(", ", routePolicies.allowedMethods(path)));
+                apiErrors.write(response, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+                        "The request method is not supported for this route.");
                 return;
             }
         }
         filterChain.doFilter(request, response);
     }
 
-    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setContentType("application/json");
-        response.addHeader("Retry-After", "1");
-        response.getWriter().write("{\"error\": \"" + message + "\"}");
+    private void rejectRateLimit(HttpServletResponse response, String code, String message, long retryAfterSeconds)
+            throws IOException {
+        response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
+        apiErrors.write(response, HttpStatus.TOO_MANY_REQUESTS, code, message);
     }
 }

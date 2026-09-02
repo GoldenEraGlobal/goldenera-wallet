@@ -1,36 +1,42 @@
 import { ZERO_ADDRESS } from '@goldenera/cryptoj'
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
-import type { TokenDtoV1} from '@project/api'
-import { useGetBalancesHook, useGetMempoolRecommendedFeesHook, getBalances, getNextNonce, submitTransaction, useGetTokensHook, type MempoolRecommendedFeesDtoV1, type MempoolRecommendedFeesLevelDtoV1 } from '@project/api'
 import {
-    Alert,
-    AlertDescription,
-    Button,
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-    cn,
-    Drawer,
-    DrawerClose,
-    DrawerContent,
-    DrawerFooter,
-    DrawerHeader,
-    DrawerTitle,
-    Field,
-    FieldError,
-    FieldLabel,
-    Input,
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-    Spinner
+  getApiErrorMessage,
+  normalizeApiInteger,
+  useGetBalancesHook,
+  useGetMempoolRecommendedFeesHook,
+  useGetTokensHook,
+  type TokenDtoV1,
+} from '@project/api'
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  cn,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  Field,
+  FieldError,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
 } from '@project/ui'
 import { Send, TriangleAlertIcon, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -38,543 +44,674 @@ import { Controller, useForm } from 'react-hook-form'
 import { NumericFormat } from 'react-number-format'
 import z from 'zod/v4'
 import { useFlow } from '../router/useFlow'
+import { TransferDurableUnknownError, type TransferReview } from '../services/TransferCoordinator'
+import { reconcileTransfers, transferCoordinator } from '../services/TransferCoordinatorService'
 import { useWalletStore } from '../store/WalletStore'
-import type { WalletSessionSnapshot } from '../store/WalletStore'
 import { parseTokenAmount } from '../utils/TokenAmount'
-import { TransferSubmission, assertTransferBalance, SubmissionCancelledError } from '../utils/TransferSubmission'
-import { compareAddress, formatWei, isNativeToken, isZeroAddress, shortenAddress } from '../utils/WalletUtil'
+import { compareAddress, formatWei, isNativeToken, isZeroAddress } from '../utils/WalletUtil'
+import { ApiErrorMessage } from './ApiErrorMessage'
 import { DataRow } from './DataRow'
 import { TokenSelect } from './TokenSelect'
 
 const txSubmitSchema = z.object({
-    tokenAddress: z.string().min(1, 'Please select a token'),
-    recipient: z.string().min(42, 'Invalid address').max(42, 'Invalid address').regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address format'),
-    amount: z.string().min(1, 'Amount is required'),
-    fee: z.enum(['fast', 'standard', 'slow']).default('standard')
+  tokenAddress: z.string().min(1, 'Please select a token'),
+  recipient: z
+    .string()
+    .min(42, 'Invalid address')
+    .max(42, 'Invalid address')
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid address format'),
+  amount: z.string().min(1, 'Amount is required'),
+  fee: z.enum(['fast', 'standard', 'slow']).default('standard'),
 })
 
 type FeeType = 'fast' | 'standard' | 'slow'
 
 type FeeOption = {
-    value: FeeType
-    label: string
+  value: FeeType
+  label: string
 }
 
 const feeOptions: FeeOption[] = [
-    { value: 'fast', label: 'Fast' },
-    { value: 'standard', label: 'Standard' },
-    { value: 'slow', label: 'Slow' }
+  { value: 'fast', label: 'Fast' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'slow', label: 'Slow' },
 ]
 
 export type TxSubmitForm = z.infer<typeof txSubmitSchema>
 
 export interface TxSubmitCardProps {
-    onSuccess?: (txHash: string) => void
-    onError?: (error: Error) => void
-    initialData?: Partial<TxSubmitForm>
+  onSuccess?: (txHash: string) => void
+  onError?: (error: Error) => void
+  initialData?: Partial<TxSubmitForm>
 }
 
-// Average transaction size in bytes, matching the Java backend AVERAGE_TX_SIZE constant
-const AVERAGE_TX_SIZE = 150n
+interface TransferDisplayToken {
+  name: string
+  symbol: string
+  decimals: number
+}
+
+function requireDisplayToken(token: TokenDtoV1 | undefined, label: string): TransferDisplayToken {
+  if (!token) throw new Error(`${label} details are unavailable`)
+  const decimals = token.numberOfDecimals
+  if (decimals === undefined || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
+    throw new Error(`${label} decimal precision is unavailable`)
+  }
+  const name = token.name?.trim() || token.smallestUnitName?.trim()
+  const symbol = token.smallestUnitName?.trim() || token.name?.trim()
+  if (!name || !symbol) throw new Error(`${label} display details are unavailable`)
+  return Object.freeze({ name, symbol, decimals })
+}
+
+function requestSubmissionReconciliation(): void {
+  void reconcileTransfers('submission').catch(() => undefined)
+}
 
 /**
- * Calculate the transaction fee based on recommended fees from the API.
- * 
- * The fee calculation formula matches the Java backend:
- * totalFee = baseFee + (feePerByte * txSize)
- * 
- * @param recommendedFees - The recommended fees from the mempool API
- * @param feeLevel - The selected fee level (fast, standard, slow)
- * @param txSizeBytes - Optional actual transaction size; uses AVERAGE_TX_SIZE if not provided
- * @returns The calculated fee in wei as bigint
+ * A balance response is only displayable when the selected token has an
+ * explicit, canonical available balance. Missing and malformed data must not
+ * be presented as a zero balance.
  */
-function calculateFee(
-    recommendedFees: MempoolRecommendedFeesDtoV1 | undefined,
-    feeLevel: FeeType,
-    txSizeBytes?: bigint
-): bigint {
-    const txSize = txSizeBytes ?? AVERAGE_TX_SIZE
+function getAvailableBalance(data: unknown, tokenAddress: string): string | null {
+  if (!Array.isArray(data) || !tokenAddress) return null
 
-    // Get the fee level data from the API response
-    const feeData: MempoolRecommendedFeesLevelDtoV1 | undefined = recommendedFees?.[feeLevel]
+  let selectedBalance: unknown = undefined
+  let hasSelectedBalance = false
+  for (const item of data) {
+    if (!item || typeof item !== 'object') return null
+    const record = item as { tokenAddress?: unknown; balance?: unknown }
+    if (typeof record.tokenAddress !== 'string' || record.tokenAddress.length === 0) return null
+    if (!compareAddress(record.tokenAddress, tokenAddress)) continue
+    if (hasSelectedBalance) return null
+    hasSelectedBalance = true
+    selectedBalance = record.balance
+  }
 
-    if (!feeData) {
-        // Fallback to minimum fee if no data available
-        // Using a reasonable default: 1000 wei base + 10 wei per byte
-        return 1000n + (10n * txSize)
-    }
-
-    // If we have totalForAverageTx and are using average size, use it directly
-    // This is the pre-calculated value from the backend for 150-byte transactions
-    if (feeData.totalForAverageTx && txSize === AVERAGE_TX_SIZE) {
-        return BigInt(feeData.totalForAverageTx)
-    }
-
-    // Calculate: baseFee + (feePerByte * txSize)
-    const baseFee = feeData.baseFee ? BigInt(feeData.baseFee) : 0n
-    const feePerByte = feeData.feePerByte ? BigInt(feeData.feePerByte) : 0n
-
-    return baseFee + (feePerByte * txSize)
+  try {
+    return !hasSelectedBalance ? null : normalizeApiInteger(selectedBalance, 'Available balance')
+  } catch {
+    return null
+  }
 }
 
 export const TxSubmitCard = ({ onSuccess, onError, initialData }: TxSubmitCardProps) => {
-    const { pop } = useFlow()
-    const address = useWalletStore(state => state.address)
-    const { data: recommendedFees } = useGetMempoolRecommendedFeesHook()
+  const { pop } = useFlow()
+  const address = useWalletStore((state) => state.address)
+  const { data: recommendedFees } = useGetMempoolRecommendedFeesHook()
 
-    // Fetch available tokens
-    const { data: tokensData, isLoading: isLoadingTokens } = useGetTokensHook()
+  // Fetch available tokens
+  const { data: tokensData, isLoading: isLoadingTokens } = useGetTokensHook()
 
-    const amountSchema = useMemo(() => txSubmitSchema.superRefine((data, context) => {
-        const token = tokensData?.find(item => compareAddress(item.address, data.tokenAddress))
+  const amountSchema = useMemo(
+    () =>
+      txSubmitSchema.superRefine((data, context) => {
+        const token = tokensData?.find((item) => compareAddress(item.address, data.tokenAddress))
         try {
-            parseTokenAmount(data.amount, token?.numberOfDecimals)
+          parseTokenAmount(data.amount, token?.numberOfDecimals)
         } catch (error) {
-            context.addIssue({ code: 'custom', path: ['amount'], message: error instanceof Error ? error.message : 'Invalid amount' })
+          context.addIssue({
+            code: 'custom',
+            path: ['amount'],
+            message: error instanceof Error ? error.message : 'Invalid amount',
+          })
         }
-    }), [tokensData])
+      }),
+    [tokensData]
+  )
 
-    const form = useForm<z.input<typeof txSubmitSchema>, unknown, TxSubmitForm>({
-        resolver: standardSchemaResolver(amountSchema),
-        defaultValues: {
-            tokenAddress: '',
-            recipient: '',
-            amount: '',
-            fee: 'standard',
-            ...initialData,
-        },
-        mode: 'onChange',
-    })
+  const form = useForm<z.input<typeof txSubmitSchema>, unknown, TxSubmitForm>({
+    resolver: standardSchemaResolver(amountSchema),
+    defaultValues: {
+      tokenAddress: '',
+      recipient: '',
+      amount: '',
+      fee: 'standard',
+      ...initialData,
+    },
+    mode: 'onChange',
+  })
 
-    const selectedTokenAddress = form.watch('tokenAddress')
+  const selectedTokenAddress = form.watch('tokenAddress')
 
-    // Fetch balance for selected token
-    const { data: balanceData } = useGetBalancesHook(
-        { query: {
-            addresses: [address!],
-            tokenAddresses: selectedTokenAddress.length > 0 ? [selectedTokenAddress, ZERO_ADDRESS] : [ZERO_ADDRESS]
-        } },
-        {
-            query: {
-                enabled: !!address
-            },
-        }
-    )
-
-    const tokens = useMemo(() => tokensData || [], [tokensData])
-    const selectedToken = useMemo(
-        () => tokens.find(t => compareAddress(t.address, selectedTokenAddress)),
-        [tokens, selectedTokenAddress]
-    )
-    const nativeToken = useMemo(
-        () => tokens.find(t => isNativeToken(t.address)),
-        [tokens]
-    )
-    const tokenDecimals = selectedToken?.numberOfDecimals ?? 8
-    const tokenSymbol = selectedToken?.smallestUnitName || selectedToken?.name || ''
-    const nativeTokenDecimals = nativeToken?.numberOfDecimals ?? 8
-    const nativeTokenSymbol = nativeToken?.smallestUnitName || nativeToken?.name || ''
-
-    // Helper function to extract balance from balance data array
-    const getBalanceFromData = useCallback((data: typeof balanceData, tokenAddress: string) => {
-        if (!data || data.length === 0 || !tokenAddress) return null
-        return data.find(b => compareAddress(b.tokenAddress, tokenAddress)) ?? null
-    }, [])
-
-    // Get balance for display (balanceData is an array directly)
-    const balance = useMemo(() => {
-        return getBalanceFromData(balanceData, selectedTokenAddress)
-    }, [balanceData, selectedTokenAddress, getBalanceFromData])
-
-    interface Review {
-        data: TxSubmitForm
-        token: TokenDtoV1
-        nativeToken: TokenDtoV1
-        fee: bigint
-        snapshot: WalletSessionSnapshot
-        operation: TransferSubmission
+  // Fetch balance for selected token
+  const {
+    data: balanceData,
+    error: balanceError,
+    isError: isBalanceError,
+    isLoading: isLoadingBalance,
+    isSuccess: isBalanceSuccess,
+  } = useGetBalancesHook(
+    {
+      query: {
+        addresses: [address!],
+        tokenAddresses:
+          selectedTokenAddress.length === 0 || isZeroAddress(selectedTokenAddress)
+            ? [ZERO_ADDRESS]
+            : [selectedTokenAddress, ZERO_ADDRESS],
+      },
+    },
+    {
+      query: {
+        enabled: !!address,
+      },
     }
-    const [review, setReview] = useState<Review | null>(null)
-    const reviewRef = useRef<Review | null>(null)
-    const preparationRef = useRef<AbortController | null>(null)
-    const mounted = useRef(true)
-    const [isPreparingReview, setIsPreparingReview] = useState(false)
-    const [isConfirming, setIsConfirming] = useState(false)
-    const [postStarted, setPostStarted] = useState(false)
-    const [submitError, setSubmitError] = useState<Error | null>(null)
-    const reviewData = review?.data ?? null
+  )
 
-    const invalidateReview = useCallback(() => {
-        preparationRef.current?.abort()
-        preparationRef.current = null
-        reviewRef.current?.operation.cancel()
-        reviewRef.current = null
-        if (mounted.current) {
-            setReview(null)
-            setIsPreparingReview(false)
-            setIsConfirming(false)
-            setPostStarted(false)
-            setSubmitError(null)
-        }
-    }, [])
+  const tokens = useMemo(() => tokensData || [], [tokensData])
+  const selectedToken = useMemo(
+    () => tokens.find((t) => compareAddress(t.address, selectedTokenAddress)),
+    [tokens, selectedTokenAddress]
+  )
+  const nativeToken = useMemo(() => tokens.find((t) => isNativeToken(t.address)), [tokens])
+  const tokenDecimals = selectedToken?.numberOfDecimals
+  const tokenSymbol = selectedToken?.smallestUnitName || selectedToken?.name || ''
+  const nativeTokenDecimals = nativeToken?.numberOfDecimals
+  const nativeTokenSymbol = nativeToken?.smallestUnitName || nativeToken?.name || ''
 
-    useEffect(() => {
-        mounted.current = true
-        const unsubscribe = useWalletStore.subscribe((state, previous) => {
-            if (state.sessionRevision !== previous.sessionRevision || state.status !== 'unlocked') invalidateReview()
-        })
-        return () => {
-            mounted.current = false
-            unsubscribe()
-            invalidateReview()
-        }
-    }, [invalidateReview])
+  const availableBalance = useMemo(
+    () => getAvailableBalance(balanceData, selectedTokenAddress),
+    [balanceData, selectedTokenAddress]
+  )
+  const isBalanceUnavailable = !isLoadingBalance && (!isBalanceSuccess || availableBalance === null)
 
-    const calcFee = useCallback((type: FeeType) => calculateFee(recommendedFees, type), [recommendedFees])
+  interface ReviewState {
+    authorization: TransferReview
+    token: TransferDisplayToken
+    nativeToken: TransferDisplayToken
+  }
+  const [review, setReview] = useState<ReviewState | null>(null)
+  const reviewRef = useRef<ReviewState | null>(null)
+  const preparationRef = useRef<symbol | null>(null)
+  const confirmationRef = useRef(false)
+  const mounted = useRef(true)
+  const [isPreparingReview, setIsPreparingReview] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
+  const [isFinalOutcome, setIsFinalOutcome] = useState(false)
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<Error | null>(null)
 
-    const onFormSubmit = async (data: TxSubmitForm) => {
-        if (preparationRef.current || reviewRef.current) return
-        const controller = new AbortController()
-        preparationRef.current = controller
-        const snapshot = useWalletStore.getState().getSessionSnapshot()
-        setIsPreparingReview(true)
-        setSubmitError(null)
-        form.clearErrors('root')
-        try {
-            if (!snapshot) throw new SubmissionCancelledError()
-            const token = tokens.find(item => compareAddress(item.address, data.tokenAddress))
-            if (!token || !nativeToken) throw new Error('Token details are not loaded yet')
-            const transfer = {
-                recipient: data.recipient,
-                tokenAddress: data.tokenAddress,
-                amount: parseTokenAmount(data.amount, token.numberOfDecimals),
-                fee: calculateFee(recommendedFees, data.fee),
-            }
-            if (!recommendedFees?.[data.fee] || transfer.fee < 0n) throw new Error('Could not fetch recommended fees')
-            if (token.userBurnable === false && isZeroAddress(data.recipient)) throw new Error('Token is not burnable')
-            if (compareAddress(data.recipient, snapshot.address)) throw new Error('Cannot send to self')
-            const balances = await getBalances({ query: { addresses: [snapshot.address], tokenAddresses: [data.tokenAddress, ZERO_ADDRESS] }, signal: controller.signal })
-            if (controller.signal.aborted || !useWalletStore.getState().isSessionCurrent(snapshot)) throw new SubmissionCancelledError()
-            assertTransferBalance(transfer, balances.data)
-            const operation = new TransferSubmission(transfer, {
-                isSessionCurrent: () => useWalletStore.getState().isSessionCurrent(snapshot),
-                getPrivateKey: () => useWalletStore.getState().getPrivateKey(),
-                fetchNonce: async signal => (await getNextNonce({ query: { address: snapshot.address }, signal })).data,
-                fetchBalances: async signal => (await getBalances({ query: { addresses: [snapshot.address], tokenAddresses: [data.tokenAddress, ZERO_ADDRESS] }, signal })).data,
-                send: async (hexData, signal) => {
-                    if (mounted.current) setPostStarted(true)
-                    return (await submitTransaction({ body: { hexData }, signal })).data
-                },
-            })
-            const nextReview: Review = { data: { ...data }, token: { ...token }, nativeToken: { ...nativeToken }, fee: transfer.fee, snapshot, operation }
-            if (!mounted.current || preparationRef.current !== controller) { operation.cancel(); return }
-            reviewRef.current = nextReview
-            setReview(nextReview)
-            setPostStarted(false)
-        } catch (error) {
-            if (!controller.signal.aborted && mounted.current && useWalletStore.getState().isSessionCurrent(snapshot)) {
-                form.setError('root', { message: error instanceof Error ? error.message : 'Could not prepare transaction' })
-            }
-        } finally {
-            if (preparationRef.current === controller) {
-                preparationRef.current = null
-                if (mounted.current) setIsPreparingReview(false)
-            }
-        }
+  const invalidateReview = useCallback(() => {
+    preparationRef.current = null
+    confirmationRef.current = false
+    reviewRef.current = null
+    if (mounted.current) {
+      setReview(null)
+      setIsPreparingReview(false)
+      setIsConfirming(false)
+      setIsFinalOutcome(false)
+      setReviewNotice(null)
+      setSubmitError(null)
     }
+  }, [])
 
-    const onConfirm = async () => {
-        const current = reviewRef.current
-        if (!current || current.operation.isPending || current.operation.hasSent) return
-        setIsConfirming(true)
-        setSubmitError(null)
-        try {
-            const hash = await current.operation.submit()
-            if (!hash || !mounted.current || reviewRef.current !== current || !useWalletStore.getState().isSessionCurrent(current.snapshot)) return
-            reviewRef.current = null
-            setReview(null)
-            onSuccess?.(hash)
-            pop()
-        } catch (error) {
-            if (!mounted.current || reviewRef.current !== current || !useWalletStore.getState().isSessionCurrent(current.snapshot)) return
-            const failure = error instanceof Error ? error : new Error('Transaction failed')
-            const displayed = current.operation.hasSent
-                ? new Error(`${failure.message}. A submission was sent; check transaction history before creating another transfer.`, { cause: failure })
-                : failure
-            setSubmitError(displayed)
-            onError?.(displayed)
-        } finally {
-            if (mounted.current && reviewRef.current === current) setIsConfirming(false)
-        }
-    }
-
-    const onCancel = () => {
-        const current = reviewRef.current
-        // Once POST starts it cannot be recalled. Allow closing after its outcome is shown.
-        if (current?.operation.hasSent && current.operation.isPending) return
+  useEffect(() => {
+    mounted.current = true
+    const unsubscribe = useWalletStore.subscribe((state, previous) => {
+      if (state.sessionRevision !== previous.sessionRevision || state.status !== 'unlocked')
         invalidateReview()
+    })
+    return () => {
+      mounted.current = false
+      unsubscribe()
+      invalidateReview()
     }
+  }, [invalidateReview])
 
-    const rootError = form.formState.errors.root?.message
-    const isLoading = isPreparingReview || isConfirming || form.formState.isLoading
-    const isDisabled = isLoading || !!review || form.formState.disabled || isLoadingTokens
+  const feeEstimate = useCallback(
+    (type: FeeType): bigint | null => {
+      const value = recommendedFees?.[type]?.totalForAverageTx
+      return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value) ? BigInt(value) : null
+    },
+    [recommendedFees]
+  )
+  const feeEstimateLabel = useCallback(
+    (type: FeeType): string => {
+      const estimate = feeEstimate(type)
+      if (
+        estimate === null ||
+        nativeTokenDecimals === undefined ||
+        !Number.isInteger(nativeTokenDecimals) ||
+        nativeTokenDecimals < 0 ||
+        nativeTokenDecimals > 255 ||
+        !nativeTokenSymbol
+      )
+        return 'estimate unavailable'
+      return `estimated ${formatWei(estimate.toString(), nativeTokenDecimals)} ${nativeTokenSymbol}`
+    },
+    [feeEstimate, nativeTokenDecimals, nativeTokenSymbol]
+  )
 
-    return (
-        <>
-            <form className="w-full" onSubmit={form.handleSubmit(onFormSubmit)}>
-                <Card className={cn('w-full')}>
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 [&_svg]:size-7 [&_svg]:text-primary">
-                            <Send />
-                        </div>
-                        <CardTitle>Send Transaction</CardTitle>
-                        <CardDescription>
-                            Transfer tokens to another address
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                        {/* Token Selection */}
-                        <Controller
-                            name="tokenAddress"
-                            control={form.control}
-                            render={({ field, fieldState }) => (
-                                <Field className="w-full">
-                                    <FieldLabel>Token</FieldLabel>
-                                    <TokenSelect
-                                        value={field.value}
-                                        onChange={(e) => {
-                                            console.log(e)
-                                            field.onChange(e)
-                                        }}
-                                        disabled={isLoadingTokens || field.disabled}
-                                        name={field.name}
-                                    />
-                                    {!!selectedToken && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Balance: {formatWei(balance?.balance || '0', tokenDecimals)} {tokenSymbol}
-                                        </p>
-                                    )}
-                                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                                </Field>
-                            )}
-                        />
+  const onFormSubmit = async (data: TxSubmitForm) => {
+    if (preparationRef.current || reviewRef.current) return
+    const preparation = Symbol('transfer-review')
+    preparationRef.current = preparation
+    const snapshot = useWalletStore.getState().getSessionSnapshot()
+    setIsPreparingReview(true)
+    setSubmitError(null)
+    form.clearErrors('root')
+    try {
+      if (!snapshot) throw new Error('Unlock the wallet before preparing a transaction')
+      const selected = tokens.find((item) => compareAddress(item.address, data.tokenAddress))
+      if (!selected || !nativeToken) throw new Error('Token details are not loaded yet')
+      const token = requireDisplayToken(selected, 'Token')
+      const nativeDisplayToken = requireDisplayToken(nativeToken, 'Native token')
+      const amount = parseTokenAmount(data.amount, token.decimals)
+      if (selected.userBurnable === false && isZeroAddress(data.recipient))
+        throw new Error('Token is not burnable')
+      if (compareAddress(data.recipient, snapshot.address)) throw new Error('Cannot send to self')
 
-                        {/* Recipient Address */}
-                        <Field className="w-full">
-                            <FieldLabel>Recipient Address</FieldLabel>
-                            <Input
-                                placeholder="0x..."
-                                {...form.register('recipient')}
-                            />
-                            {form.formState.errors.recipient && (
-                                <FieldError>{form.formState.errors.recipient.message}</FieldError>
-                            )}
-                        </Field>
+      const authorization = await transferCoordinator.prepare({
+        sender: snapshot.address,
+        recipient: data.recipient,
+        tokenAddress: data.tokenAddress,
+        amount: amount.toString(),
+        feeLevel: data.fee,
+      })
+      if (
+        !mounted.current ||
+        preparationRef.current !== preparation ||
+        !useWalletStore.getState().isSessionCurrent(snapshot)
+      )
+        return
+      const nextReview = Object.freeze({ authorization, token, nativeToken: nativeDisplayToken })
+      reviewRef.current = nextReview
+      setReview(nextReview)
+      setIsFinalOutcome(false)
+      setReviewNotice(null)
+    } catch (error) {
+      if (mounted.current && preparationRef.current === preparation) {
+        form.setError('root', {
+          message: getApiErrorMessage(error, 'Could not prepare transaction'),
+        })
+      }
+    } finally {
+      if (preparationRef.current === preparation) {
+        preparationRef.current = null
+        if (mounted.current) setIsPreparingReview(false)
+      }
+    }
+  }
 
-                        {/* Amount Input */}
-                        <Controller
-                            name="amount"
-                            control={form.control}
-                            render={({ field, fieldState }) => (
-                                <Field className="w-full">
-                                    <FieldLabel>Amount</FieldLabel>
-                                    <NumericFormat
-                                        customInput={Input}
-                                        placeholder={formatWei('0', tokenDecimals)}
-                                        allowNegative={false}
-                                        thousandSeparator=","
-                                        decimalSeparator="."
-                                        inputMode="decimal"
-                                        allowedDecimalSeparators={['.', ',']}
-                                        value={field.value}
-                                        onValueChange={(values) => {
-                                            field.onChange(values.value)
-                                        }}
-                                    />
-                                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                                </Field>
-                            )}
-                        />
+  const onConfirm = async () => {
+    const current = reviewRef.current
+    if (!current || confirmationRef.current || isFinalOutcome) return
+    confirmationRef.current = true
+    setIsConfirming(true)
+    setReviewNotice(null)
+    setSubmitError(null)
+    try {
+      const result = await transferCoordinator.confirm(current.authorization)
+      if (result.kind === 'unknown') requestSubmissionReconciliation()
+      if (!mounted.current || reviewRef.current !== current) return
+      if (result.kind === 'reconfirm') {
+        const updated = Object.freeze({ ...current, authorization: result.review })
+        reviewRef.current = updated
+        setReview(updated)
+        setReviewNotice(
+          'Network or wallet conditions changed. Review the updated transaction before confirming again.'
+        )
+        return
+      }
+      if (result.kind === 'accepted') {
+        reviewRef.current = null
+        setReview(null)
+        onSuccess?.(result.record.hash)
+        pop()
+        return
+      }
 
-                        {/* Fee Input */}
-                        <Controller
-                            name="fee"
-                            control={form.control}
-                            render={({ field, fieldState }) => {
-                                const selectedToken = feeOptions.find((feeOption) => feeOption.value === field.value)
-                                let selectedTokenLabel = 'Select fee'
-                                if (selectedToken) {
-                                    const calculatedFee = calcFee(selectedToken.value)
-                                    selectedTokenLabel = `${selectedToken.label} ${formatWei(calculatedFee.toString(), nativeTokenDecimals)} ${nativeTokenSymbol}`
-                                }
-                                return (
-                                    <Field className="w-full">
-                                        <FieldLabel>Fee</FieldLabel>
-                                        <Select
-                                            value={field.value}
-                                            onValueChange={field.onChange}
-                                            disabled={field.disabled}
-                                            name={field.name}
-                                        >
-                                            <SelectTrigger className="w-full h-9" size="lg">
-                                                <SelectValue className="flex items-center gap-2">
-                                                    {isLoadingTokens ? <Spinner /> : null}
-                                                    <span>{selectedTokenLabel}</span>
-                                                </SelectValue>
-                                            </SelectTrigger>
+      setIsFinalOutcome(true)
+      const failure =
+        result.kind === 'unknown'
+          ? new Error(
+              'The submission outcome is unknown. Do not retry; wait for transaction reconciliation.'
+            )
+          : new Error(
+              'The transaction was rejected. Close this review and prepare a new transaction before retrying.'
+            )
+      setSubmitError(failure)
+      onError?.(failure)
+    } catch (error) {
+      const durableUnknown = error instanceof TransferDurableUnknownError
+      if (durableUnknown) requestSubmissionReconciliation()
+      if (!mounted.current || reviewRef.current !== current) return
+      if (durableUnknown) {
+        setIsFinalOutcome(true)
+        const failure = new Error(
+          `${getApiErrorMessage(error, 'Transaction could not be completed safely')}. Close this review and wait for any unresolved attempt to reconcile before retrying.`,
+          { cause: error }
+        )
+        setSubmitError(failure)
+        onError?.(failure)
+        return
+      }
+      const failure = new Error(
+        getApiErrorMessage(error, 'Transaction could not be completed safely'),
+        { cause: error }
+      )
+      setSubmitError(failure)
+      onError?.(failure)
+    } finally {
+      confirmationRef.current = false
+      if (mounted.current && reviewRef.current) setIsConfirming(false)
+    }
+  }
 
-                                            <SelectContent>
-                                                <SelectGroup>
-                                                    <SelectLabel>Network fee</SelectLabel>
-                                                    {feeOptions.map((feeOption) => (
-                                                        <SelectItem key={feeOption.value} value={feeOption.value} className='flex items-center gap-2'>
-                                                            {feeOption.label} ({formatWei(calcFee(feeOption.value).toString(), nativeTokenDecimals)} {nativeTokenSymbol})
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectGroup>
-                                            </SelectContent>
-                                        </Select>
-                                        {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
-                                    </Field>
-                                )
-                            }}
-                        />
+  const onCancel = () => {
+    if (confirmationRef.current) return
+    invalidateReview()
+  }
 
-                        {/* Root Error */}
-                        {rootError && (
-                            <Alert variant="destructive">
-                                <TriangleAlertIcon />
-                                <AlertDescription>
-                                    {rootError}
-                                </AlertDescription>
-                            </Alert>
+  const rootError = form.formState.errors.root?.message
+  const isLoading = isPreparingReview || isConfirming || form.formState.isLoading
+  const isDisabled = isLoading || !!review || form.formState.disabled || isLoadingTokens
+
+  return (
+    <>
+      <form className="w-full" onSubmit={form.handleSubmit(onFormSubmit)}>
+        <Card className={cn('w-full')}>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 [&_svg]:size-7 [&_svg]:text-primary">
+              <Send />
+            </div>
+            <CardTitle>Send Transaction</CardTitle>
+            <CardDescription>Transfer tokens to another address</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {/* Token Selection */}
+            <Controller
+              name="tokenAddress"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field className="w-full">
+                  <FieldLabel>Token</FieldLabel>
+                  <TokenSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={isLoadingTokens || field.disabled}
+                    name={field.name}
+                  />
+                  {!!selectedToken &&
+                    tokenDecimals !== undefined &&
+                    Number.isInteger(tokenDecimals) &&
+                    tokenDecimals >= 0 &&
+                    tokenDecimals <= 255 && (
+                      <div className="mt-1 space-y-1">
+                        {isBalanceError && availableBalance !== null ? (
+                          <p className="text-xs text-muted-foreground">
+                            Balance: {formatWei(availableBalance, tokenDecimals)} {tokenSymbol}
+                          </p>
+                        ) : isBalanceError ? (
+                          <p className="text-xs text-muted-foreground">Balance unavailable</p>
+                        ) : isLoadingBalance ? (
+                          <p className="text-xs text-muted-foreground" role="status">
+                            Balance: Loading balance…
+                          </p>
+                        ) : isBalanceSuccess && availableBalance !== null ? (
+                          <p className="text-xs text-muted-foreground">
+                            Balance: {formatWei(availableBalance, tokenDecimals)} {tokenSymbol}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Balance unavailable</p>
                         )}
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-3">
-                        <Button
-                            type="submit"
-                            size="lg"
-                            className="w-full"
-                            disabled={isDisabled}
-                        >
-                            {isLoading ? (
-                                <>
-                                    <Spinner />
-                                    Sending...
-                                </>
-                            ) : (
-                                <>
-                                    <Send className="size-4 mr-2" />
-                                    Submit
-                                </>
-                            )}
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </form>
-            <TxSubmitConfirm
-                onConfirm={onConfirm}
-                onCancel={onCancel}
-                data={reviewData}
-                token={review?.token}
-                nativeToken={review?.nativeToken}
-                fee={review?.fee ?? 0n}
-                isLoading={isConfirming}
-                hasSent={postStarted}
-                error={submitError}
+                        {isBalanceError && (
+                          <p className="text-xs text-destructive" role="alert">
+                            <ApiErrorMessage
+                              error={balanceError}
+                              fallbackMessage="Balance could not be refreshed"
+                            />
+                          </p>
+                        )}
+                        {(isBalanceError || isBalanceUnavailable) && (
+                          <p className="text-xs text-muted-foreground">
+                            Balance will be verified before transaction review.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                </Field>
+              )}
             />
-        </>
-    )
+
+            {/* Recipient Address */}
+            <Field className="w-full">
+              <FieldLabel>Recipient Address</FieldLabel>
+              <Input placeholder="0x..." {...form.register('recipient')} />
+              {form.formState.errors.recipient && (
+                <FieldError>{form.formState.errors.recipient.message}</FieldError>
+              )}
+            </Field>
+
+            {/* Amount Input */}
+            <Controller
+              name="amount"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field className="w-full">
+                  <FieldLabel>Amount</FieldLabel>
+                  <NumericFormat
+                    customInput={Input}
+                    placeholder={
+                      tokenDecimals !== undefined &&
+                      Number.isInteger(tokenDecimals) &&
+                      tokenDecimals >= 0 &&
+                      tokenDecimals <= 255
+                        ? formatWei('0', tokenDecimals)
+                        : '0'
+                    }
+                    allowNegative={false}
+                    thousandSeparator=","
+                    decimalSeparator="."
+                    inputMode="decimal"
+                    allowedDecimalSeparators={['.', ',']}
+                    value={field.value}
+                    onValueChange={(values) => {
+                      field.onChange(values.value)
+                    }}
+                  />
+                  {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                </Field>
+              )}
+            />
+
+            {/* Fee Input */}
+            <Controller
+              name="fee"
+              control={form.control}
+              render={({ field, fieldState }) => {
+                const selectedOption = feeOptions.find(
+                  (feeOption) => feeOption.value === field.value
+                )
+                const selectedLabel = selectedOption
+                  ? `${selectedOption.label} (${feeEstimateLabel(selectedOption.value)})`
+                  : 'Select fee'
+                return (
+                  <Field className="w-full">
+                    <FieldLabel>Fee</FieldLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={field.disabled}
+                      name={field.name}
+                    >
+                      <SelectTrigger className="w-full h-9" size="lg">
+                        <SelectValue className="flex items-center gap-2">
+                          {isLoadingTokens ? <Spinner /> : null}
+                          <span>{selectedLabel}</span>
+                        </SelectValue>
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Network fee</SelectLabel>
+                          {feeOptions.map((feeOption) => (
+                            <SelectItem
+                              key={feeOption.value}
+                              value={feeOption.value}
+                              className="flex items-center gap-2"
+                            >
+                              {feeOption.label} ({feeEstimateLabel(feeOption.value)})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}
+                  </Field>
+                )
+              }}
+            />
+
+            {/* Root Error */}
+            {rootError && (
+              <Alert variant="destructive">
+                <TriangleAlertIcon />
+                <AlertDescription>{rootError}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3">
+            <Button type="submit" size="lg" className="w-full" disabled={isDisabled}>
+              {isLoading ? (
+                <>
+                  <Spinner />
+                  Preparing...
+                </>
+              ) : (
+                <>
+                  <Send className="size-4 mr-2" />
+                  Submit
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      </form>
+      <TxSubmitConfirm
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        review={review?.authorization ?? null}
+        token={review?.token}
+        nativeToken={review?.nativeToken}
+        isLoading={isConfirming}
+        finalOutcome={isFinalOutcome}
+        notice={reviewNotice}
+        error={submitError}
+      />
+    </>
+  )
 }
 
 interface TxSubmitConfirmProps {
-    onConfirm: () => void
-    onCancel: () => void
-    data: TxSubmitForm | null
-    token?: TokenDtoV1
-    nativeToken?: TokenDtoV1
-    fee: bigint
-    hasSent: boolean
-    isLoading: boolean
-    error: Error | null
+  onConfirm: () => void
+  onCancel: () => void
+  review: TransferReview | null
+  token?: TransferDisplayToken
+  nativeToken?: TransferDisplayToken
+  isLoading: boolean
+  finalOutcome: boolean
+  notice: string | null
+  error: Error | null
 }
 
-const TxSubmitConfirm = ({ onConfirm, onCancel, data, token, nativeToken, fee, isLoading, hasSent, error }: TxSubmitConfirmProps) => {
+const TxSubmitConfirm = ({
+  onConfirm,
+  onCancel,
+  review,
+  token,
+  nativeToken,
+  isLoading,
+  finalOutcome,
+  notice,
+  error,
+}: TxSubmitConfirmProps) => {
+  const feeDisplay = review && nativeToken ? formatWei(review.fee, nativeToken.decimals) : null
+  const amountDisplay = review && token ? formatWei(review.amount, token.decimals) : null
 
-    const feeDisplay = nativeToken ? formatWei(fee.toString(), nativeToken.numberOfDecimals) : '0'
+  return (
+    <Drawer
+      open={!!review && !!token && !!nativeToken}
+      onOpenChange={(open) => !open && onCancel()}
+    >
+      <DrawerContent>
+        <DrawerHeader className="relative pb-4">
+          <DrawerClose
+            render={(props) => (
+              <button
+                {...props}
+                type="button"
+                disabled={isLoading}
+                aria-label="Close transaction review"
+                className="absolute right-4 -top-2 p-2 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          />
 
-    return (
-        <Drawer open={!!data && !!token} onOpenChange={(open) => !open && onCancel()}>
-            <DrawerContent>
-                {/* Simple header with status and amount */}
+          <DrawerTitle>Review Transaction</DrawerTitle>
+        </DrawerHeader>
 
-                <DrawerHeader className="relative pb-4">
-                    <DrawerClose
-                        render={(props) => (
-                            <button
-                                type="button"
-                                disabled={isLoading && hasSent}
-                                aria-label="Close transaction review"
-                                className="absolute right-4 -top-2 p-2 rounded-full hover:bg-muted transition-colors"
-                                {...props}
-                            >
-                                <X className="size-4" />
-                            </button>
-                        )}
-                    />
+        {!!review && !!token && !!nativeToken && feeDisplay !== null && amountDisplay !== null && (
+          <div className="px-4 overflow-y-auto max-h-[60vh] flex flex-col gap-1">
+            <DataRow
+              label="Recipient"
+              value={review.recipient}
+              valueToCopy={review.recipient}
+              copyable
+            />
+            <DataRow label="Network Fee" value={`${feeDisplay} ${nativeToken.symbol}`} />
+            <DataRow label="Fee Level" value={review.feeLevel} />
+            <DataRow label="Token" value={token.name} />
+            <DataRow label="Amount" value={`${amountDisplay} ${token.symbol}`} />
+          </div>
+        )}
 
-                    <DrawerTitle>
-                        Review Transaction
-                    </DrawerTitle>
-                </DrawerHeader>
+        {notice && (
+          <div className="px-4 mt-4">
+            <Alert>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+          </div>
+        )}
 
-                {/* Scrollable key-value list */}
-                {!!data && !!token && !!nativeToken && (
-                    <div className="px-4 overflow-y-auto max-h-[60vh] flex flex-col gap-1">
-                        <DataRow label="Recipient" value={shortenAddress(data.recipient)} valueToCopy={data.recipient} copyable />
-                        <DataRow label="Network Fee" value={`${feeDisplay} ${nativeToken.smallestUnitName}`} />
-                        <DataRow label="Token" value={token.name} />
-                        <DataRow label="Amount" value={`${data.amount} ${token.smallestUnitName}`} />
-                    </div>
-                )}
+        {error && (
+          <div className="px-4 mt-4">
+            <Alert variant="destructive">
+              <TriangleAlertIcon className="h-4 w-4" />
+              <AlertDescription>
+                <ApiErrorMessage error={error} />
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
-                {error && (
-                    <div className="px-4 mt-4">
-                        <Alert variant="destructive">
-                            <TriangleAlertIcon className="h-4 w-4" />
-                            <AlertDescription>
-                                {error.message}
-                            </AlertDescription>
-                        </Alert>
-                    </div>
-                )}
-
-                <DrawerFooter>
-                    <DrawerClose render={(props) => (
-                        <Button variant="outline" className="w-full" {...props} disabled={isLoading && hasSent}>
-                            {hasSent ? 'Close' : 'Cancel'}
-                        </Button>
-                    )} />
-                    <Button
-                        size="lg"
-                        className="w-full"
-                        onClick={onConfirm}
-                        disabled={isLoading || hasSent}
-                    >
-                        {isLoading ? (
-                            <>
-                                <Spinner />
-                                Sending...
-                            </>
-                        ) : (
-                            <>
-                                <Send className="size-4 mr-2" />
-                                Confirm
-                            </>
-                        )}
-                    </Button>
-                </DrawerFooter>
-            </DrawerContent>
-        </Drawer>
-    )
+        <DrawerFooter>
+          <DrawerClose
+            render={(props) => (
+              <Button variant="outline" className="w-full" {...props} disabled={isLoading}>
+                {finalOutcome ? 'Close' : 'Cancel'}
+              </Button>
+            )}
+          />
+          {!finalOutcome && (
+            <Button size="lg" className="w-full" onClick={onConfirm} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Spinner />
+                  Finalizing...
+                </>
+              ) : (
+                <>
+                  <Send className="size-4 mr-2" />
+                  Confirm
+                </>
+              )}
+            </Button>
+          )}
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  )
 }

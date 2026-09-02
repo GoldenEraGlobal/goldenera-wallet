@@ -89,6 +89,7 @@ test('MAINNET read-only: real token UI, account/history/fees and validation erro
   const invalid = await get('/api/core/v1/wallet/balances?addresses=')
   expect(invalid.status()).toBe(400)
   expect(submitAttempts).toBe(0)
+  expect(suppressedLocalRegistration, 'The retired PWA must not attempt device registration').toBe(0)
   const forwardedWrites = forwardedMethods.filter(method => !['GET', 'HEAD'].includes(method)).length
   expect(forwardedWrites).toBe(0)
   expect(browserReads.every(read => read.status === 200)).toBe(true)

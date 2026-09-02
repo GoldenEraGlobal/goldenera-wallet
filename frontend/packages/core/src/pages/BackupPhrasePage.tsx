@@ -3,22 +3,17 @@ import {
     Button,
     Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle,
     Checkbox,
-    Label,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger
+    Label
 } from '@project/ui'
 import type { ActivityComponentType } from '@stackflow/react'
-import { AlertTriangle, Copy, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { MnemonicGrid } from '../components/MnemonicGrid'
-import { useCopy } from '../hooks/useCopy'
 import { BasicLayout } from '../layouts/Layouts'
 import { useWalletStore } from '../store/WalletStore'
 import { privacyScreen } from '../utils/PrivacyUtil'
 
 export const BackupPhrasePage: ActivityComponentType<'BackupPhrasePage'> = () => {
-    const { copy, copied } = useCopy()
     const backup = useWalletStore(state => state.backupWallet)
     const backupPhrase = useWalletStore(state => state.backupPhrase)
     const error = useWalletStore(state => state.error)
@@ -30,11 +25,21 @@ export const BackupPhrasePage: ActivityComponentType<'BackupPhrasePage'> = () =>
         return privacyScreen()
     }, [])
 
-    const handleCopyMnemonic = async () => {
-        if (backupPhrase) {
-            await copy(backupPhrase)
+    useEffect(() => {
+        const hidePhrase = () => setShowMnemonic(false)
+        const onVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') hidePhrase()
         }
-    }
+        document.addEventListener('visibilitychange', onVisibilityChange)
+        window.addEventListener('pagehide', hidePhrase)
+        window.addEventListener('blur', hidePhrase)
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange)
+            window.removeEventListener('pagehide', hidePhrase)
+            window.removeEventListener('blur', hidePhrase)
+            hidePhrase()
+        }
+    }, [])
 
     const handleContinue = async () => {
         if (pending) return
@@ -68,6 +73,7 @@ export const BackupPhrasePage: ActivityComponentType<'BackupPhrasePage'> = () =>
                     )}
                     <div className="flex gap-2.5">
                         <Button
+                            type="button"
                             variant="outline"
                             size="sm"
                             className="flex-1"
@@ -85,22 +91,6 @@ export const BackupPhrasePage: ActivityComponentType<'BackupPhrasePage'> = () =>
                                 </>
                             )}
                         </Button>
-                        <Tooltip open={copied}>
-                            <TooltipTrigger onClick={handleCopyMnemonic} render={(props) => (
-                                <Button
-                                    {...props}
-                                    className='flex-1'
-                                    variant="outline"
-                                    size="sm"
-                                >
-                                    <Copy />
-                                    Copy
-                                </Button>
-                            )} />
-                            <TooltipContent>
-                                <p>{copied ? 'Copied!' : 'Copy'}</p>
-                            </TooltipContent>
-                        </Tooltip>
                     </div>
                     <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
                         <Checkbox

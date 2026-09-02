@@ -24,7 +24,7 @@ async function holdNonce(page: Page) {
   await page.route('**/api/core/v1/wallet/next-nonce**', async route => {
     const nonce = ++count
     await gate
-    await route.fulfill({ status: 200, contentType: 'application/json', body: String(nonce) }).catch(() => {})
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(String(nonce)) }).catch(() => {})
   })
   return { release, count: () => count }
 }
@@ -75,7 +75,15 @@ test('F1: auto-lock while nonce is pending prevents a late signed submission', a
 test('F6: zero-decimal token balances stay whole in the list and detail', async ({ page }) => {
   await page.route('**/api/core/v1/wallet/balances**', async route => {
     const addresses = new URL(route.request().url()).searchParams.getAll('tokenAddresses')
-    const balances = tokens.filter(token => !addresses.length || addresses.includes(token.address)).map(token => ({ address: PUBLIC_ADDRESS, tokenAddress: token.address, balance: token.numberOfDecimals === 0 ? '100' : '100000000000' }))
+    const balances = tokens.filter(token => !addresses.length || addresses.includes(token.address)).map(token => {
+      const holdings = token.numberOfDecimals === 0 ? '100' : '100000000000'
+      return {
+        address: PUBLIC_ADDRESS,
+        tokenAddress: token.address,
+        balance: token.numberOfDecimals === 0 ? '0' : holdings,
+        totalBalance: holdings,
+      }
+    })
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(balances) })
   })
   await importPublicWallet(page)
@@ -104,7 +112,7 @@ test('F8: switching the history filter from page three requests page one', async
     requests.push({ page: pageNumber, filter })
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
       content: pageNumber < totalPages ? [{ status: 'CONFIRMED', txHash: `0x${String(pageNumber + 1).repeat(64)}`, transferType: filter ?? 'TRANSFER', from: RECIPIENT, to: PUBLIC_ADDRESS, tokenAddress: NATIVE_TOKEN, amount: '100000000', fee: '2500', timestamp: '2026-08-31T12:00:00Z' }] : [],
-      pageNumber, pageSize: 15, totalPages, totalElements: totalPages, pendingCount: 0,
+      pageNumber, pageSize: 15, totalPages, totalElements: String(totalPages), pendingCount: '0', confirmedCount: String(totalPages),
     }) })
   })
   await importPublicWallet(page)

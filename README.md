@@ -15,11 +15,11 @@
 ## CI image publication
 
 - A push to a non-default internal branch publishes the verified multi-platform image as the mutable `ghcr.io/goldeneraglobal/goldenera-wallet:dev` alias and also preserves `sha-<full-commit-sha>`.
-- A push to the current default-branch head publishes only the immutable full-SHA alias.
-- An approved `vX.Y.Z` tag publishes immutable full-SHA and semantic-version aliases plus the GitHub Release.
+- A push to the current default-branch head publishes only the stable full-SHA alias.
+- An approved `vX.Y.Z` tag publishes stable full-SHA and semantic-version aliases plus the GitHub Release.
 - Pull requests and manual validation runs never write images or releases.
 
-The `dev` alias is intentionally mutable and must not be used for production deployment. Production must use the tag-and-digest form documented below.
+The `dev` alias is intentionally mutable and must not be used for production deployment. OCI registries do not guarantee tag immutability, so production must use the tag-and-digest form documented below; the digest is the immutable image identity.
 
 ---
 

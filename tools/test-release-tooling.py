@@ -89,7 +89,7 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     require("assert_current_default_head" in recheck and "assert_current_source_branch_head" in recheck and "assert_version_publication_ready" in recheck, "Native builders must recheck every publication identity")
     require("A non-publishing run reached an image builder" in recheck, "Non-publish modes must fail closed in image builders")
 
-    require(has_active(images, ["arguments+=(--header", "If-None-Match: *)"]), "Immutable aliases require an active If-None-Match create-only header")
+    require("If-None-Match" not in images, "Registry publication must not rely on unsupported conditional manifest PUT semantics")
     put_body = images.split("put_manifest() {", 1)[1].split("\n}", 1)[0]
     put_active = active_lines(put_body)
     guarded_call = ["assert_package_write_identity", "||", "return", "1"]
@@ -98,17 +98,17 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     curl_index = next(index for index, tokens in enumerate(put_active) if tokens[0] == "curl")
     require(guard_index < curl_index, "Every registry PUT must recheck publication identity before sending bytes")
     require("assert_version_publication_ready" in images.split("assert_package_write_identity()", 1)[1].split("\n}", 1)[0], "Every version registry PUT must recheck tag, ancestry, and ruleset")
-    require(has_active(images, ["probe_status=$(put_manifest $manifest_digest $final_manifest true $probe_prefix)"]), "Conditional semantics must be probed at a content digest")
-    require("no aliases were published" in images and "unconditional digest replay" in images, "Registry capability proof must fail before aliases and distinguish duplicate rejection")
+    require(has_active(images, ["stage_status=$(put_manifest $manifest_digest $final_manifest $stage_prefix)"]), "Final bytes must be staged and verified at their content digest before publishing aliases")
     require("(.manifests | length) == 4" in images, "Final aliases must contain two runnable and two attestation descriptors")
     require("runnable_descriptor" in images and "attestation_descriptor" in images, "Final index must preserve verified platform descriptors")
-    require(images.count('inspect_existing_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must inspect the immutable SHA alias for exact recovery")
-    require(images.count('inspect_existing_immutable_alias "$VERSION"') == 1, "Version recovery must inspect the semantic alias")
-    require("adopt_existing_manifest" in images and "cmp -s" in images, "Existing immutable aliases must be adopted only when their exact bytes agree")
+    require(images.count('inspect_existing_stable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must inspect the stable SHA alias for exact recovery")
+    require(images.count('inspect_existing_stable_alias "$VERSION"') == 1, "Version recovery must inspect the semantic alias")
+    require("adopt_existing_manifest" in images and "cmp -s" in images, "Existing stable aliases must be adopted only when their exact bytes agree")
     require("verify_attested_index" in images and "https://slsa.dev/provenance/v1" in images and "https://spdx.dev/Document" in images, "Adopted and new indexes must verify linked provenance and SBOM")
     require("curl --fail --location --proto '=https' --proto-redir '=https'" in images, "Attestation blob downloads must follow GHCR redirects without permitting a protocol downgrade")
-    require(images.count('publish_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must ensure a full-SHA alias")
-    require(images.count('publish_immutable_alias "$VERSION"') == 1, "Version mode must ensure exactly one semantic alias")
+    require(images.count('publish_stable_alias "sha-$COMMIT_SHA" "$sha_alias_exists"') == 3, "All publishing modes must ensure a full-SHA alias")
+    require(images.count('publish_stable_alias "$VERSION" "$version_alias_exists"') == 1, "Version mode must ensure exactly one semantic alias")
+    require("if [[ \"$already_exists\" == 'true' ]]" in images and "verify_manifest_reference" in images, "Existing stable aliases must be verified without rewriting them")
     require(images.count('publish_mutable_alias "dev"') == 1, "Development mode must publish exactly one mutable dev alias")
     require("assert_current_source_branch_head" in images.split("assert_package_write_identity()", 1)[1].split("\n}", 1)[0], "Every development registry PUT must recheck the source-branch head")
     require("publish_latest" not in images and "manifests/latest" not in images, "Immutable publication must never read or move latest")
@@ -399,7 +399,7 @@ def run_jq_fixture(filter_source: str, payload: dict, expected: bool, *args: str
 
 
 def run_oci_fixtures(script: str) -> None:
-    section = script.split("verify_attested_index() {", 1)[1].split("\n}\n\ninspect_existing_immutable_alias", 1)[0]
+    section = script.split("verify_attested_index() {", 1)[1].split("\n}\n\ninspect_existing_stable_alias", 1)[0]
     index_marker = '--arg arm64 "$arm64_image_digest" \'\n'
     index_start = section.index(index_marker) + len(index_marker)
     index_end = section.index('\n    \' "$index"', index_start)
@@ -471,8 +471,66 @@ def run_oci_fixtures(script: str) -> None:
     run_jq_fixture(manifest_filter, wrong_predicate, False)
 
 
+def run_stable_alias_fixtures() -> None:
+    with tempfile.TemporaryDirectory(prefix="wallet-stable-alias-fixture-") as temporary:
+        directory = Path(temporary)
+        put_log = directory / "put.log"
+        verify_log = directory / "verify.log"
+        env = {
+            **dict(__import__("os").environ),
+            "API_URL": "https://api.github.test",
+            "COMMIT_SHA": "a" * 40,
+            "CONSUMED_RELEASE_VERSION": "0.0.1",
+            "GH_TOKEN": "token",
+            "GITHUB_OUTPUT": str(directory / "output"),
+            "IMAGE": "registry.test/owner/image",
+            "IMAGE_NAME": "owner/image",
+            "JAR_SHA256": "b" * 64,
+            "MODE": "dev",
+            "PUT_LOG": str(put_log),
+            "REGISTRY_HOST": "registry.test",
+            "REGISTRY_USER": "actor",
+            "REPOSITORY": "owner/repository",
+            "RUNNER_TEMP": str(directory),
+            "VERIFY_LOG": str(verify_log),
+        }
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                r'''set -euo pipefail
+require_release_env() { :; }
+source <(sed -e '/^source /d' -e '/^metadata_dir=/,$d' "$1")
+final_manifest="$RUNNER_TEMP/final.json"
+manifest_digest="sha256:$(printf 'c%.0s' {1..64})"
+put_manifest() {
+  [[ "$#" == 3 && "$1" == 'sha-test' && "$2" == "$final_manifest" ]]
+  printf x >> "$PUT_LOG"
+  printf 201
+}
+verify_manifest_reference() {
+  [[ "$#" == 2 && "$1" == 'sha-test' ]]
+  printf x >> "$VERIFY_LOG"
+}
+publish_stable_alias sha-test true
+[[ ! -e "$PUT_LOG" && "$(wc -c < "$VERIFY_LOG")" == 1 ]]
+publish_stable_alias sha-test false
+[[ "$(wc -c < "$PUT_LOG")" == 1 && "$(wc -c < "$VERIFY_LOG")" == 2 ]]
+''',
+                "fixture",
+                str(SCRIPTS["images"]),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        require(result.returncode == 0, f"Stable alias fixture failed: {result.stderr}")
+
+
 def run_fixtures(scripts: dict[str, str]) -> None:
     run_oci_fixtures(scripts["images"])
+    run_stable_alias_fixtures()
     valid_ruleset = {
         "target": "tag",
         "enforcement": "active",
@@ -552,9 +610,9 @@ def negative_mutations(scripts: dict[str, str]) -> list[tuple[str, dict[str, str
     return [
         ("comment-hidden publish mode", changed("identity", "publish_mode=none", "publish_mode=default # publish_mode=none")),
         ("development mode loses branch-head gate", changed("identity", "  if assert_current_source_branch_head; then\n    publish_mode=dev", "  if true; then # assert_current_source_branch_head\n    publish_mode=dev")),
-        ("commented create-only header", changed("images", "arguments+=(--header 'If-None-Match: *')", ": # If-None-Match: *")),
+        ("existing stable alias rewritten", changed("images", "if [[ \"$already_exists\" == 'true' ]]; then", "if [[ \"$already_exists\" == 'never' ]]; then")),
         ("two-descriptor alias", changed("images", "(.manifests | length) == 4", "(.manifests | length) == 2")),
-        ("version moves latest", changed("images", 'publish_immutable_alias "$VERSION"', "publish_latest # publish_immutable_alias \"$VERSION\"")),
+        ("version moves latest", changed("images", 'publish_stable_alias "$VERSION"', "publish_latest # publish_stable_alias \"$VERSION\"")),
         ("development alias becomes latest", changed("images", 'publish_mutable_alias "dev"', 'publish_mutable_alias "latest"')),
         ("registry write loses identity guard", changed("images", "  assert_package_write_identity || return 1\n  arguments=(", "  : # assert_package_write_identity || return 1\n  arguments=(")),
         ("version write loses ruleset proof", changed("images", "      assert_version_publication_ready", "      assert_release_tag_commit")),

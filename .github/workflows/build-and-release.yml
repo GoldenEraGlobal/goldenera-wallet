@@ -517,10 +517,11 @@ jobs:
       - build
       - build-images
     runs-on: ubuntu-24.04
-    # Development publishers serialize on the shared mutable :dev alias. Immutable
-    # default/version aliases remain isolated by their verified commit identity.
+    # GHCR does not implement atomic conditional manifest creation. Serialize every
+    # alias publisher so the checked pre-read/write/post-read sequence cannot race
+    # another workflow from this repository.
     concurrency:
-      group: wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.publish_mode == 'dev' && 'dev' || needs.build.outputs.commit_sha }}
+      group: wallet-image-alias-${{ github.repository }}
       cancel-in-progress: false
     permissions:
       actions: read

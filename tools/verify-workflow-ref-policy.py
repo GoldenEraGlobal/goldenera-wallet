@@ -400,9 +400,9 @@ def verify_publication_jobs(jobs: dict[str, dict[str, Any]]) -> None:
     require(aliases.get("if") == "needs.build.outputs.publish_mode != 'none'", "Image alias job must be publication-gated")
     require(set(sequence(aliases.get("needs"), "Image alias dependencies must be a list")) == {"build", "build-images"}, "Image aliases must depend on the one verified build and native images")
     require(aliases.get("concurrency") == {
-        "group": "wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.publish_mode == 'dev' && 'dev' || needs.build.outputs.commit_sha }}",
+        "group": "wallet-image-alias-${{ github.repository }}",
         "cancel-in-progress": False,
-    }, "Development alias publishers must serialize while immutable publishers remain commit-isolated")
+    }, "All GHCR alias publishers must serialize because the registry has no atomic create-only manifest operation")
     publish = step_with_id(aliases, "publish-images", "publish")
     require(run_text(publish, "Immutable publication") == "tools/publish-image-aliases.sh", "Immutable publication must use the checked extracted script")
     require(publish.get("env") == {
@@ -508,7 +508,7 @@ def negative_mutations() -> list[tuple[str, Callable[[str], str]]]:
         ("build package write", lambda text: replace_once(text, "  build:\n    name: Build and verify once\n    runs-on: ubuntu-24.04\n    permissions:\n      contents: read\n      packages: read\n", "  build:\n    name: Build and verify once\n    runs-on: ubuntu-24.04\n    permissions:\n      contents: read\n      packages: write\n")),
         ("legacy concurrency overlap removed", lambda text: replace_once(text, "  group: wallet-build-${{ github.ref }}\n", "  group: wallet-validation-${{ github.ref }}\n")),
         ("mutable latest job restored", lambda text: replace_once(text, "  release:\n", "  publish-latest:\n    runs-on: ubuntu-24.04\n    steps: []\n\n  release:\n")),
-        ("development alias race", lambda text: replace_once(text, "      group: wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.publish_mode == 'dev' && 'dev' || needs.build.outputs.commit_sha }}\n", "      group: wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.commit_sha }}\n")),
+        ("image alias race", lambda text: replace_once(text, "      group: wallet-image-alias-${{ github.repository }}\n", "      group: wallet-image-alias-${{ github.repository }}-${{ needs.build.outputs.commit_sha }}\n")),
         ("release waits for latest", lambda text: replace_once(text, "      - publish-images\n    runs-on: ubuntu-24.04\n    concurrency:\n      group: wallet-release-publication", "      - publish-images\n      - publish-latest\n    runs-on: ubuntu-24.04\n    concurrency:\n      group: wallet-release-publication")),
         ("direct GitHub interpolation", lambda text: replace_once(text, "        run: tools/resolve-build-identity.sh\n", "        run: printf '%s' '${{ github.repository }}'\n")),
         ("unpinned parser", lambda text: replace_once(text, "PyYAML==6.0.2", "PyYAML")),

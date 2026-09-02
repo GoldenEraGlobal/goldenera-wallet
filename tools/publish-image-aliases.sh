@@ -41,7 +41,7 @@ assert_package_write_identity() {
 }
 
 put_manifest() {
-  local reference="$1" body="$2" conditional="$3" prefix="$4"
+  local reference="$1" body="$2" prefix="$3"
   local -a arguments
   # Every registry PUT rechecks the observable Git ref, default-branch ancestry,
   # and (for versions) tag ruleset immediately before sending bytes.
@@ -56,9 +56,6 @@ put_manifest() {
     --output "$prefix.body"
     --write-out '%{http_code}'
   )
-  if [[ "$conditional" == 'true' ]]; then
-    arguments+=(--header 'If-None-Match: *')
-  fi
   curl "${arguments[@]}" "https://$REGISTRY_HOST/v2/$IMAGE_NAME/manifests/$reference"
 }
 
@@ -172,7 +169,7 @@ verify_attested_index() {
   done
 }
 
-inspect_existing_immutable_alias() {
+inspect_existing_stable_alias() {
   local alias="$1" prefix status actual_header actual_bytes
   prefix="$RUNNER_TEMP/existing-${alias//[^A-Za-z0-9_.-]/_}"
   status="$(fetch_manifest_reference "$alias" "$prefix")"
@@ -180,13 +177,13 @@ inspect_existing_immutable_alias() {
     return 1
   fi
   [[ "$status" == '200' ]] || {
-    echo "Unable to inspect immutable image alias $IMAGE:$alias (HTTP $status)." >&2
+    echo "Unable to inspect stable image alias $IMAGE:$alias (HTTP $status)." >&2
     exit 1
   }
   actual_header="$(response_header "$prefix.headers" 'Docker-Content-Digest')"
   actual_bytes="sha256:$(sha256sum "$prefix.body" | awk '{print $1}')"
   [[ "$actual_header" =~ ^sha256:[0-9a-f]{64}$ && "$actual_bytes" == "$actual_header" ]] || {
-    echo "Immutable image alias $IMAGE:$alias returned inconsistent manifest identity." >&2
+    echo "Stable image alias $IMAGE:$alias returned inconsistent manifest identity." >&2
     exit 1
   }
   verify_attested_index "$prefix.body" "$prefix-verify"
@@ -201,11 +198,11 @@ adopt_existing_manifest() {
     selected_manifest_digest="$existing_manifest_digest"
   else
     [[ "$existing_manifest_digest" == "$selected_manifest_digest" ]] && cmp -s -- "$existing_manifest_file" "$selected_manifest" || {
-      echo "Immutable image alias $IMAGE:$alias conflicts with the other immutable alias for this release." >&2
+      echo "Stable image alias $IMAGE:$alias conflicts with the other stable alias for this release." >&2
       exit 1
     }
   fi
-  echo "Verified existing immutable image alias for exact-state recovery: $IMAGE:$alias"
+  echo "Verified existing stable image alias for exact-state recovery: $IMAGE:$alias"
 }
 
 verify_manifest_reference() {
@@ -223,37 +220,29 @@ verify_manifest_reference() {
   }
 }
 
-publish_immutable_alias() {
-  local alias="$1" prefix replay_status status
+publish_stable_alias() {
+  local alias="$1" already_exists="$2" prefix status
   [[ "$alias" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] || exit 1
-  prefix="$RUNNER_TEMP/immutable-${alias//[^A-Za-z0-9_.-]/_}"
-  status="$(put_manifest "$alias" "$final_manifest" true "$prefix")"
-  case "$status" in
-    201)
-      echo "Created immutable image alias: $IMAGE:$alias"
-      ;;
-    412)
-      echo "Immutable image alias already exists or won a race; verifying exact identity: $IMAGE:$alias"
-      ;;
-    *)
-      echo "Conditional creation of immutable alias $IMAGE:$alias failed closed (HTTP $status)." >&2
-      exit 1
-      ;;
-  esac
-  verify_manifest_reference "$alias" "$prefix-verify"
-  replay_status="$(put_manifest "$alias" "$final_manifest" true "$prefix-replay")"
-  [[ "$replay_status" == '412' ]] || {
-    echo "Registry did not preserve create-only semantics for immutable tag $IMAGE:$alias (HTTP $replay_status)." >&2
+  prefix="$RUNNER_TEMP/stable-${alias//[^A-Za-z0-9_.-]/_}"
+  if [[ "$already_exists" == 'true' ]]; then
+    verify_manifest_reference "$alias" "$prefix-existing-verify"
+    echo "Verified existing stable image alias: $IMAGE:$alias"
+    return
+  fi
+  status="$(put_manifest "$alias" "$final_manifest" "$prefix")"
+  [[ "$status" == '201' ]] || {
+    echo "Publishing stable image alias $IMAGE:$alias failed (HTTP $status)." >&2
     exit 1
   }
-  verify_manifest_reference "$alias" "$prefix-replay-verify"
+  verify_manifest_reference "$alias" "$prefix-verify"
+  echo "Published stable image alias: $IMAGE:$alias"
 }
 
 publish_mutable_alias() {
   local alias="$1" prefix status
   [[ "$alias" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]] || exit 1
   prefix="$RUNNER_TEMP/mutable-${alias//[^A-Za-z0-9_.-]/_}"
-  status="$(put_manifest "$alias" "$final_manifest" false "$prefix")"
+  status="$(put_manifest "$alias" "$final_manifest" "$prefix")"
   [[ "$status" == '201' ]] || {
     echo "Publishing mutable image alias $IMAGE:$alias failed (HTTP $status)." >&2
     exit 1
@@ -335,27 +324,33 @@ selected_manifest="$RUNNER_TEMP/selected-final-image-index.json"
 selected_manifest_digest=
 existing_manifest_file=
 existing_manifest_digest=
+sha_alias_exists=false
+version_alias_exists=false
 case "$MODE" in
   default)
     require_release_env GRAPHQL_URL SOURCE_BRANCH
-    if inspect_existing_immutable_alias "sha-$COMMIT_SHA"; then
+    if inspect_existing_stable_alias "sha-$COMMIT_SHA"; then
+      sha_alias_exists=true
       adopt_existing_manifest "sha-$COMMIT_SHA"
     fi
     ;;
   dev)
     require_release_env GRAPHQL_URL SOURCE_BRANCH
     assert_current_source_branch_head
-    if inspect_existing_immutable_alias "sha-$COMMIT_SHA"; then
+    if inspect_existing_stable_alias "sha-$COMMIT_SHA"; then
+      sha_alias_exists=true
       adopt_existing_manifest "sha-$COMMIT_SHA"
     fi
     ;;
   version)
     require_release_env API_URL GRAPHQL_URL RELEASE_TAG VERSION
     assert_version_publication_ready
-    if inspect_existing_immutable_alias "sha-$COMMIT_SHA"; then
+    if inspect_existing_stable_alias "sha-$COMMIT_SHA"; then
+      sha_alias_exists=true
       adopt_existing_manifest "sha-$COMMIT_SHA"
     fi
-    if inspect_existing_immutable_alias "$VERSION"; then
+    if inspect_existing_stable_alias "$VERSION"; then
+      version_alias_exists=true
       adopt_existing_manifest "$VERSION"
     fi
     ;;
@@ -377,7 +372,7 @@ verify_attested_index "$final_manifest" "$RUNNER_TEMP/selected-final-verify"
 # can only accept these exact bytes at this reference, so this staging
 # operation cannot move a tag or replace different content.
 stage_prefix="$RUNNER_TEMP/content-addressed-stage"
-stage_status="$(put_manifest "$manifest_digest" "$final_manifest" false "$stage_prefix")"
+stage_status="$(put_manifest "$manifest_digest" "$final_manifest" "$stage_prefix")"
 [[ "$stage_status" == '201' ]] || {
   echo "Content-addressed manifest staging failed (HTTP $stage_status)." >&2
   exit 1
@@ -388,49 +383,26 @@ stage_status="$(put_manifest "$manifest_digest" "$final_manifest" false "$stage_
 }
 verify_manifest_reference "$manifest_digest" "$RUNNER_TEMP/content-addressed-verify"
 
-# Establish that an ordinary duplicate content-addressed PUT succeeds;
-# this distinguishes the following HTTP 412 from a registry that merely
-# rejects every duplicate digest regardless of request preconditions.
-replay_prefix="$RUNNER_TEMP/content-addressed-replay"
-replay_status="$(put_manifest "$manifest_digest" "$final_manifest" false "$replay_prefix")"
-[[ "$replay_status" == '201' ]] || {
-  echo "Registry cannot prove conditional semantics because an unconditional digest replay returned HTTP $replay_status." >&2
-  exit 1
-}
-verify_manifest_reference "$manifest_digest" "$RUNNER_TEMP/content-addressed-replay-verify"
-
-# Prove this registry evaluates HTTP create-only preconditions before
-# touching any alias. If it ignores If-None-Match, this request can only
-# rewrite identical bytes at the content digest; the job then fails and
-# no immutable or mutable tag has been touched.
-probe_prefix="$RUNNER_TEMP/conditional-capability-probe"
-probe_status="$(put_manifest "$manifest_digest" "$final_manifest" true "$probe_prefix")"
-[[ "$probe_status" == '412' ]] || {
-  echo "Registry did not prove atomic If-None-Match create-only semantics (HTTP $probe_status); no aliases were published." >&2
-  exit 1
-}
-verify_manifest_reference "$manifest_digest" "$RUNNER_TEMP/conditional-capability-verify"
-
 case "$MODE" in
   default)
     assert_current_default_head
-    publish_immutable_alias "sha-$COMMIT_SHA"
+    publish_stable_alias "sha-$COMMIT_SHA" "$sha_alias_exists"
     assert_current_default_head
     ;;
   dev)
     assert_current_source_branch_head
-    publish_immutable_alias "sha-$COMMIT_SHA"
+    publish_stable_alias "sha-$COMMIT_SHA" "$sha_alias_exists"
     assert_current_source_branch_head
     publish_mutable_alias "dev"
     assert_current_source_branch_head
     ;;
   version)
     assert_release_version_identity
-    publish_immutable_alias "sha-$COMMIT_SHA"
+    publish_stable_alias "sha-$COMMIT_SHA" "$sha_alias_exists"
     assert_release_version_identity
     # The put_manifest boundary guard repeats ruleset and identity verification
-    # before both the create-only semantic PUT and its conditional replay.
-    publish_immutable_alias "$VERSION"
+    # immediately before creating a missing stable alias.
+    publish_stable_alias "$VERSION" "$version_alias_exists"
     assert_release_version_identity
     ;;
 esac

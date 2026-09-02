@@ -57,7 +57,7 @@ PRIVILEGED_STEP_ALLOWLIST = {
         ("action", "", f"docker/login-action@{ACTION_PINS['docker/login-action']}"): 1,
         ("run", "", "54fd0bdfe726c4bda70aa280d0deec1036d630bf2a84c9042b7a340b0da6f4de"): 1,
         ("action", "image", f"docker/build-push-action@{ACTION_PINS['docker/build-push-action']}"): 1,
-        ("run", "", "f90f1f60de988557f753c4cada7b2f24f8aafc246907cc5931705f2d11fc46cb"): 1,
+        ("run", "", "a949a1f7894d5a766c2e8f0a19db66d0927a6e1c8a13d35c7a55ea3182538796"): 1,
         ("action", "", f"actions/upload-artifact@{ACTION_PINS['actions/upload-artifact']}"): 1,
     }),
     "publish-images": Counter({
@@ -374,7 +374,7 @@ def verify_native_images(jobs: dict[str, dict[str, Any]]) -> None:
     require(len(verification_steps) == 1, "Native image job must exactly verify the pushed platform artifact")
     verification = run_text(verification_steps[0], "Platform verification")
     for required in (
-        '(.manifests | length) == 2', "attestation-manifest", "https://slsa.dev/provenance/v0.2",
+        '(.manifests | length) == 2', "attestation-manifest", "https://slsa.dev/provenance/v1",
         "https://spdx.dev/Document", "any(.subject[]?; .digest.sha256 == $subject)",
         '{{.Config.User}}', '{{json .Config.Entrypoint}}', '{{json .Config.Cmd}}',
         'docker cp "$container_id:/app/app.jar"', "runnable_descriptor", "attestation_descriptor",

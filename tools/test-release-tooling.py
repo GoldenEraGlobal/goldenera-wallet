@@ -105,7 +105,7 @@ def verify_scripts(scripts: dict[str, str]) -> None:
     require(images.count('inspect_existing_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must inspect the immutable SHA alias for exact recovery")
     require(images.count('inspect_existing_immutable_alias "$VERSION"') == 1, "Version recovery must inspect the semantic alias")
     require("adopt_existing_manifest" in images and "cmp -s" in images, "Existing immutable aliases must be adopted only when their exact bytes agree")
-    require("verify_attested_index" in images and "https://slsa.dev/provenance/v0.2" in images and "https://spdx.dev/Document" in images, "Adopted and new indexes must verify linked provenance and SBOM")
+    require("verify_attested_index" in images and "https://slsa.dev/provenance/v1" in images and "https://spdx.dev/Document" in images, "Adopted and new indexes must verify linked provenance and SBOM")
     require(images.count('publish_immutable_alias "sha-$COMMIT_SHA"') == 3, "All publishing modes must ensure a full-SHA alias")
     require(images.count('publish_immutable_alias "$VERSION"') == 1, "Version mode must ensure exactly one semantic alias")
     require(images.count('publish_mutable_alias "dev"') == 1, "Development mode must publish exactly one mutable dev alias")
@@ -376,7 +376,7 @@ def python_jq_fixture(filter_source: str, payload: dict, args: tuple[str, ...]) 
         and len(layers) == 2
         and all(layer.get("mediaType") == "application/vnd.in-toto+json" and isinstance(layer.get("digest"), str) and digest_pattern.fullmatch(layer["digest"]) for layer in layers)
         and sorted(layer.get("annotations", {}).get("in-toto.io/predicate-type") for layer in layers)
-        == ["https://slsa.dev/provenance/v0.2", "https://spdx.dev/Document"]
+        == ["https://slsa.dev/provenance/v1", "https://spdx.dev/Document"]
     )
 
 
@@ -454,7 +454,7 @@ def run_oci_fixtures(script: str) -> None:
             {
                 "mediaType": "application/vnd.in-toto+json",
                 "digest": "sha256:" + "e" * 64,
-                "annotations": {"in-toto.io/predicate-type": "https://slsa.dev/provenance/v0.2"},
+                "annotations": {"in-toto.io/predicate-type": "https://slsa.dev/provenance/v1"},
             },
             {
                 "mediaType": "application/vnd.in-toto+json",
@@ -466,7 +466,7 @@ def run_oci_fixtures(script: str) -> None:
     run_jq_fixture(manifest_filter, valid_attestation, True)
     run_jq_fixture(manifest_filter, valid_attestation | {"layers": valid_attestation["layers"][:1]}, False)
     wrong_predicate = json.loads(json.dumps(valid_attestation))
-    wrong_predicate["layers"][1]["annotations"]["in-toto.io/predicate-type"] = "https://example.invalid"
+    wrong_predicate["layers"][1]["annotations"]["in-toto.io/predicate-type"] = "https://slsa.dev/provenance/v0.2"
     run_jq_fixture(manifest_filter, wrong_predicate, False)
 
 

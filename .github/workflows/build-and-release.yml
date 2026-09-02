@@ -332,7 +332,10 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          [[ "$ARCH" == 'amd64' || "$ARCH" == 'arm64' ]] || exit 1
+          [[ "$ARCH" == 'amd64' || "$ARCH" == 'arm64' ]] || {
+            echo "Unsupported native image architecture: $ARCH" >&2
+            exit 1
+          }
           [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || {
             echo 'Build did not return a canonical image digest.' >&2
             exit 1
@@ -350,12 +353,19 @@ jobs:
               .platform.architecture == "unknown" and
               .annotations["vnd.docker.reference.type"] == "attestation-manifest"
             )] | length) == 1
-          ' "$root_manifest" > /dev/null
+          ' "$root_manifest" > /dev/null || {
+            echo 'Platform root is not the expected runnable-plus-attestation OCI index:' >&2
+            cat "$root_manifest" >&2
+            exit 1
+          }
 
           image_digest="$(jq -er --arg arch "$ARCH" '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch) | .digest' "$root_manifest")"
           attestation_digest="$(jq -er '.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest") | .digest' "$root_manifest")"
           linked_digest="$(jq -er '.manifests[] | select(.annotations["vnd.docker.reference.type"] == "attestation-manifest") | .annotations["vnd.docker.reference.digest"]' "$root_manifest")"
-          [[ "$image_digest" =~ ^sha256:[0-9a-f]{64}$ && "$attestation_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+          [[ "$image_digest" =~ ^sha256:[0-9a-f]{64}$ && "$attestation_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo 'Platform index returned a non-canonical runnable or attestation digest.' >&2
+            exit 1
+          }
           [[ "$linked_digest" == "$image_digest" ]] || {
             echo 'Attestation manifest is not linked to the runnable platform manifest.' >&2
             exit 1
@@ -369,7 +379,11 @@ jobs:
             (.config.digest | test("^sha256:[0-9a-f]{64}$")) and
             (.layers | length) > 0 and
             all(.layers[]; .digest | test("^sha256:[0-9a-f]{64}$"))
-          ' "$runnable_manifest" > /dev/null
+          ' "$runnable_manifest" > /dev/null || {
+            echo 'Runnable platform manifest has an unexpected OCI shape:' >&2
+            cat "$runnable_manifest" >&2
+            exit 1
+          }
 
           docker pull "$IMAGE@$image_digest" > /dev/null
           [[ "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$IMAGE@$image_digest")" == "linux/$ARCH" ]] || {
@@ -415,8 +429,12 @@ jobs:
             (.layers | length) == 2 and
             all(.layers[]; .mediaType == "application/vnd.in-toto+json") and
             ([.layers[].annotations["in-toto.io/predicate-type"]] | sort) ==
-              ["https://slsa.dev/provenance/v0.2", "https://spdx.dev/Document"]
-          ' "$attestation_manifest" > /dev/null
+              ["https://slsa.dev/provenance/v1", "https://spdx.dev/Document"]
+          ' "$attestation_manifest" > /dev/null || {
+            echo 'Attestation manifest must contain exactly SLSA provenance v1 and SPDX SBOM layers:' >&2
+            cat "$attestation_manifest" >&2
+            exit 1
+          }
 
           token_response="$RUNNER_TEMP/registry-token.json"
           curl --fail --silent --show-error --retry 3 --get \
@@ -427,7 +445,10 @@ jobs:
           registry_token="$(jq -er '.token // .access_token' "$token_response")"
 
           while IFS=$'\t' read -r predicate_type layer_digest; do
-            [[ "$layer_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+            [[ "$layer_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+              echo "Attestation layer for $predicate_type has a non-canonical digest." >&2
+              exit 1
+            }
             statement="$RUNNER_TEMP/attestation-${layer_digest#sha256:}.json"
             curl --fail --silent --show-error --retry 3 \
               --header "Authorization: Bearer $registry_token" \
@@ -439,7 +460,10 @@ jobs:
             jq -e --arg predicate "$predicate_type" --arg subject "${image_digest#sha256:}" '
               .predicateType == $predicate and
               any(.subject[]?; .digest.sha256 == $subject)
-            ' "$statement" > /dev/null
+            ' "$statement" > /dev/null || {
+              echo "Attestation statement $predicate_type is not linked to runnable manifest $image_digest." >&2
+              exit 1
+            }
           done < <(jq -r '.layers[] | [.annotations["in-toto.io/predicate-type"], .digest] | @tsv' "$attestation_manifest")
 
           metadata_dir="$RUNNER_TEMP/image-metadata"

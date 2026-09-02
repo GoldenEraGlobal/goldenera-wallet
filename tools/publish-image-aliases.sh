@@ -146,7 +146,7 @@ verify_attested_index() {
         .mediaType == "application/vnd.in-toto+json" and
         (.digest | test("^sha256:[0-9a-f]{64}$"))) and
       ([.layers[].annotations["in-toto.io/predicate-type"]] | sort) ==
-        ["https://slsa.dev/provenance/v0.2", "https://spdx.dev/Document"]
+        ["https://slsa.dev/provenance/v1", "https://spdx.dev/Document"]
     ' "$attestation_manifest" > /dev/null || {
       echo 'Linked attestation manifest lacks the exact provenance and SPDX SBOM layer set.' >&2
       exit 1

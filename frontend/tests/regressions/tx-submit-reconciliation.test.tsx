@@ -132,7 +132,9 @@ const review = {
   acceptedNonceHighWater: null,
   timestamp: '1700000000000',
   estimatedSignedSize: 137,
-  recommendation: { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' },
+  recommendation: {
+    baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500',
+  },
   balanceFingerprint: `${sender}|${native}=1000000|${token}=1000000`,
   preparedAt: 1_700_000_000_000,
 } as const

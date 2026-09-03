@@ -41,6 +41,8 @@ const feeLevelSchema = z.enum(['fast', 'standard', 'slow'])
 const feeRecommendationSchema = z.object({
   baseFee: decimalSchema,
   feePerByte: decimalSchema,
+  minimumTotalFee: decimalSchema,
+  miningFeePerByte: decimalSchema,
   totalForAverageTx: decimalSchema,
 }).strict()
 

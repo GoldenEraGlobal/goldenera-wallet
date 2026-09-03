@@ -52,7 +52,9 @@ beforeEach(() => {
   harness.balances.mockResolvedValue({ data: [{ tokenAddress: ZERO_ADDRESS, balance: '1000000000' }] })
   harness.fees.mockResolvedValue({
     data: {
-      standard: { baseFee: '10', feePerByte: '1', totalForAverageTx: '100' },
+      standard: {
+        baseFee: '10', feePerByte: '1', minimumTotalFee: '100', miningFeePerByte: '0', totalForAverageTx: '100',
+      },
     },
   })
   harness.submit.mockResolvedValue({ data: { status: 'SUCCESS', message: null } })

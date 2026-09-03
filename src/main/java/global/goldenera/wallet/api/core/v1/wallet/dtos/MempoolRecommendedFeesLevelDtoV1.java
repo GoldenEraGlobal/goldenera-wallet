@@ -37,5 +37,11 @@ public record MempoolRecommendedFeesLevelDtoV1(
                 pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String feePerByte,
         @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String minimumTotalFee,
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
+                pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String miningFeePerByte,
+        @NotNull @Pattern(regexp = "^(0|[1-9][0-9]*)$") @Size(max = 78)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string",
                 pattern = "^(0|[1-9][0-9]*)$", maxLength = 78) String totalForAverageTx) {
 }

@@ -231,6 +231,8 @@ public interface WalletMapper {
         return new MempoolRecommendedFeesLevelDtoV1(
                 requiredCanonicalUint256(source.getBaseFee(), "recommended base fee"),
                 requiredCanonicalUint256(source.getFeePerByte(), "recommended fee per byte"),
+                requiredCanonicalUint256(source.getMinimumTotalFee(), "recommended minimum total fee"),
+                requiredCanonicalUint256(source.getMiningFeePerByte(), "recommended mining fee per byte"),
                 requiredCanonicalUint256(source.getTotalForAverageTx(), "recommended average transaction fee"));
     }
 

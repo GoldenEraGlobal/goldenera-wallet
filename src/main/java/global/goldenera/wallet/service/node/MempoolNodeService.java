@@ -56,7 +56,7 @@ public class MempoolNodeService {
      *            Raw transaction data
      * @return Result of the submission
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    // A transport timeout may occur after acceptance; never automatically resubmit signed transactions.
     public MempoolResult submitTransaction(MempoolSubmitTxDtoV1 input) {
         return mempoolApi.submitTx(input).getBody();
     }
@@ -64,7 +64,7 @@ public class MempoolNodeService {
     /**
      * Get recommended transaction fees based on current mempool state.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public RecommendedFeesDtoV1 getRecommendedFees() {
         return mempoolApi.getRecommendedFees().getBody();
     }

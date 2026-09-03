@@ -27,8 +27,6 @@ import static lombok.AccessLevel.PRIVATE;
 
 import java.util.List;
 
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -46,8 +44,7 @@ public class SubscriptionSyncService {
 
     WebhookNodeService webhookNodeService;
 
-    @EventListener(ApplicationReadyEvent.class)
-    @Scheduled(fixedDelay = 3600000)
+    @Scheduled(initialDelay = 1000, fixedDelay = 3600000)
     public void syncSubscriptions() {
         log.info("Starting subscription sync with Blockchain Node...");
         // Subscribe to new blocks (idempotent, ensures we always track new blocks)

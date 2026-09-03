@@ -9,3 +9,4 @@ export { TxSubmitCard, type TxSubmitCardProps } from './components/TxSubmitCard'
 
 // Storage (for advanced usage)
 export { StorageService, type BasicStorageAdapter, type SecureStorageAdapter } from './services/StorageService'
+export { configureWalletResetBarrier, WalletResetBarrierError, type WalletResetBarrier } from './services/WalletResetBarrierService'

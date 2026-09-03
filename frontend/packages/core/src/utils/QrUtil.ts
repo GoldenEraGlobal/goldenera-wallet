@@ -1,4 +1,4 @@
-import { isValidChecksumAddress } from "@goldenera/cryptoj"
+import { isValidChecksumAddress } from '@goldenera/cryptoj'
 
 export type QrData = {
     address: string
@@ -21,6 +21,9 @@ export const stringToQrData = (qrString: string) => {
     }
     if (!isValidChecksumAddress(tokenAddress)) {
         throw new Error('Invalid token address')
+    }
+    if (amount !== undefined && (!/^\d+(?:\.\d+)?$/.test(amount) || !/[1-9]/.test(amount))) {
+        throw new Error('Invalid amount')
     }
     return {
         tokenAddress,

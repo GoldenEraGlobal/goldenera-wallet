@@ -8,9 +8,9 @@ import {
     Spinner,
     Switch, Textarea
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertCircle, ChevronLeft, Download, Fingerprint, KeyRound, ScanFace, Shield } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { BasicLayout } from '../layouts/Layouts'
@@ -26,7 +26,7 @@ const mnemonicSchema = z.object({
             const words = val.trim().split(/\s+/)
             return words.length === 12 || words.length === 24
         }, 'Recovery phrase must be 12 or 24 words')
-        .refine((val) => WalletUtil.isValidMnemonic(val.trim()), 'Invalid recovery phrase'),
+        .refine((val) => WalletUtil.isValidMnemonic(val.trim().toLowerCase().replace(/\s+/g, ' ')), 'Invalid recovery phrase'),
 })
 
 // Schema for Password
@@ -51,11 +51,11 @@ type PasswordForm = z.infer<typeof passwordSchema>
 
 type Step = 'mnemonic' | 'password'
 
-export const ImportWalletPage: ActivityComponentType = () => {
+export const ImportWalletPage: ActivityComponentType<'ImportWalletPage'> = () => {
     const { pop } = useFlow()
     const importWallet = useWalletStore((state) => state.importWallet)
     const [step, setStep] = useState<Step>('mnemonic')
-    const [mnemonic, setMnemonic] = useState('')
+    const mnemonicRef = useRef('')
     const biometric = useWalletStore((state) => state.biometric)
     const [error, setError] = useState<string | null>(null)
 
@@ -77,8 +77,17 @@ export const ImportWalletPage: ActivityComponentType = () => {
         mode: 'onChange',
     })
 
+    useEffect(() => {
+        return () => {
+            mnemonicRef.current = ''
+            mnemonicForm.unregister('mnemonic')
+            passwordForm.unregister(['password', 'confirmPassword'])
+        }
+    }, [mnemonicForm, passwordForm])
+
     const handleMnemonicSubmit = (data: MnemonicForm) => {
-        setMnemonic(data.mnemonic.trim().toLowerCase().replace(/\s+/g, ' '))
+        mnemonicRef.current = data.mnemonic.trim().toLowerCase().replace(/\s+/g, ' ')
+        mnemonicForm.reset({ mnemonic: '' })
         setStep('password')
         setError(null)
     }
@@ -86,7 +95,10 @@ export const ImportWalletPage: ActivityComponentType = () => {
     const handleImport = async (data: PasswordForm) => {
         setError(null)
         try {
-            await importWallet(mnemonic, data.password, data.biometric)
+            await importWallet(mnemonicRef.current, data.password, data.biometric)
+            mnemonicRef.current = ''
+            mnemonicForm.reset({ mnemonic: '' })
+            passwordForm.reset()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to import wallet')
         }
@@ -95,8 +107,10 @@ export const ImportWalletPage: ActivityComponentType = () => {
     const handleBack = () => {
         setError(null)
         if (step === 'password') {
-            setStep('mnemonic')
+            mnemonicRef.current = ''
+            mnemonicForm.reset({ mnemonic: '' })
             passwordForm.reset()
+            setStep('mnemonic')
         } else {
             pop()
         }
@@ -140,6 +154,10 @@ export const ImportWalletPage: ActivityComponentType = () => {
                                 <Textarea
                                     id="mnemonic"
                                     placeholder="Enter your recovery phrase..."
+                                    autoComplete="off"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
                                     className="min-h-[120px] resize-none font-mono text-sm break-all"
                                     {...mnemonicForm.register('mnemonic')}
                                 />
@@ -202,7 +220,7 @@ export const ImportWalletPage: ActivityComponentType = () => {
                             <PasswordInput
                                 placeholder="Enter your password"
                                 {...passwordForm.register('password')}
-                                disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading}
+                                disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting}
                             />
                             {passwordError && <FieldError>{passwordError}</FieldError>}
                         </Field>
@@ -212,7 +230,7 @@ export const ImportWalletPage: ActivityComponentType = () => {
                             <PasswordInput
                                 placeholder="Confirm your password"
                                 {...passwordForm.register('confirmPassword')}
-                                disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading}
+                                disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting}
                             />
                             {confirmError && <FieldError>{confirmError}</FieldError>}
                         </Field>
@@ -228,10 +246,12 @@ export const ImportWalletPage: ActivityComponentType = () => {
                                 <Controller
                                     render={({ field }) => (
                                         <Switch
-                                            {...field as any}
                                             id="biometric"
                                             checked={field.value}
+                                            disabled={field.disabled}
+                                            onBlur={field.onBlur}
                                             onCheckedChange={field.onChange}
+                                            ref={field.ref}
                                         />
                                     )}
                                     name="biometric"
@@ -246,10 +266,10 @@ export const ImportWalletPage: ActivityComponentType = () => {
                         type="button"
                         size="lg"
                         className="w-full"
-                        disabled={passwordForm.formState.disabled || passwordForm.formState.isLoading || !passwordForm.formState.isValid}
+                        disabled={passwordForm.formState.disabled || passwordForm.formState.isSubmitting || !passwordForm.formState.isValid}
                         onClick={passwordForm.handleSubmit(handleImport)}
                     >
-                        {passwordForm.formState.isLoading ? (
+                        {passwordForm.formState.isSubmitting ? (
                             <>
                                 <Spinner />
                                 Importing Wallet...

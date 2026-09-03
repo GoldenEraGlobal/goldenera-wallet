@@ -1,16 +1,18 @@
-import { getTransfersQueryParamsTransferTypeEnum, GetTransfersQueryParamsTransferTypeEnumKey } from "@project/api";
-import { FamilyDrawerAnimatedContent, FamilyDrawerAnimatedWrapper, FamilyDrawerButton, FamilyDrawerClose, FamilyDrawerContent, FamilyDrawerOverlay, FamilyDrawerPortal, FamilyDrawerRoot, FamilyDrawerViewContent, ViewsRegistry } from "@project/ui";
-import { ArrowRightLeft, Flame, ListFilter, Receipt, Sparkles, Trophy } from "lucide-react";
-import { createContext, useCallback, useContext, useState } from "react";
-import { useUncontrolledProp } from "uncontrollable";
+import type { GetTransfersTransferTypeKey } from '@project/api'
+import { getTransfersTransferType } from '@project/api'
+import type { ViewsRegistry } from '@project/ui'
+import { FamilyDrawerAnimatedContent, FamilyDrawerAnimatedWrapper, FamilyDrawerButton, FamilyDrawerClose, FamilyDrawerContent, FamilyDrawerOverlay, FamilyDrawerPortal, FamilyDrawerRoot, FamilyDrawerViewContent } from '@project/ui'
+import { ArrowRightLeft, Flame, ListFilter, Receipt, Sparkles, Trophy } from 'lucide-react'
+import { createContext, useCallback, useContext, useState } from 'react'
+import { useUncontrolledProp } from 'uncontrollable'
 
 export interface TransferFilterProps {
     children: (open: () => void) => React.ReactNode
-    filter?: GetTransfersQueryParamsTransferTypeEnumKey
-    onFilterChange?: (filter?: GetTransfersQueryParamsTransferTypeEnumKey) => void
+    filter?: GetTransfersTransferTypeKey
+    onFilterChange?: (filter?: GetTransfersTransferTypeKey) => void
 }
 
-const TransferFilterContext = createContext<{ filter?: GetTransfersQueryParamsTransferTypeEnumKey, setFilter: (filter?: GetTransfersQueryParamsTransferTypeEnumKey) => void }>({ filter: undefined, setFilter: () => { } })
+const TransferFilterContext = createContext<{ filter?: GetTransfersTransferTypeKey, setFilter: (filter?: GetTransfersTransferTypeKey) => void }>({ filter: undefined, setFilter: () => { } })
 
 function MinimalView() {
     const { filter, setFilter } = useContext(TransferFilterContext)
@@ -27,32 +29,32 @@ function MinimalView() {
                     All
                 </FamilyDrawerButton>
                 <FamilyDrawerButton
-                    aria-selected={getTransfersQueryParamsTransferTypeEnum.TRANSFER === filter}
-                    onClick={() => setFilter(getTransfersQueryParamsTransferTypeEnum.TRANSFER)}>
+                    aria-selected={getTransfersTransferType.TRANSFER === filter}
+                    onClick={() => setFilter(getTransfersTransferType.TRANSFER)}>
                     <ArrowRightLeft className="h-5 w-5" />
                     Transfer
                 </FamilyDrawerButton>
                 <FamilyDrawerButton
-                    aria-selected={getTransfersQueryParamsTransferTypeEnum.BURN === filter}
-                    onClick={() => setFilter(getTransfersQueryParamsTransferTypeEnum.BURN)}>
+                    aria-selected={getTransfersTransferType.BURN === filter}
+                    onClick={() => setFilter(getTransfersTransferType.BURN)}>
                     <Flame className="h-5 w-5" />
                     Burn
                 </FamilyDrawerButton>
                 <FamilyDrawerButton
-                    aria-selected={getTransfersQueryParamsTransferTypeEnum.MINT === filter}
-                    onClick={() => setFilter(getTransfersQueryParamsTransferTypeEnum.MINT)}>
+                    aria-selected={getTransfersTransferType.MINT === filter}
+                    onClick={() => setFilter(getTransfersTransferType.MINT)}>
                     <Sparkles className="h-5 w-5" />
                     Mint
                 </FamilyDrawerButton>
                 <FamilyDrawerButton
-                    aria-selected={getTransfersQueryParamsTransferTypeEnum.BLOCK_FEES === filter}
-                    onClick={() => setFilter(getTransfersQueryParamsTransferTypeEnum.BLOCK_FEES)}>
+                    aria-selected={getTransfersTransferType.BLOCK_FEES === filter}
+                    onClick={() => setFilter(getTransfersTransferType.BLOCK_FEES)}>
                     <Receipt className="h-5 w-5" />
                     Block fees
                 </FamilyDrawerButton>
                 <FamilyDrawerButton
-                    aria-selected={getTransfersQueryParamsTransferTypeEnum.BLOCK_REWARD === filter}
-                    onClick={() => setFilter(getTransfersQueryParamsTransferTypeEnum.BLOCK_REWARD)}>
+                    aria-selected={getTransfersTransferType.BLOCK_REWARD === filter}
+                    onClick={() => setFilter(getTransfersTransferType.BLOCK_REWARD)}>
                     <Trophy className="h-5 w-5" />
                     Block reward
                 </FamilyDrawerButton>
@@ -69,7 +71,7 @@ const minimalViews: ViewsRegistry = {
 export function TransferFilter({ children, filter: filterProp, onFilterChange }: TransferFilterProps) {
     const [open, setOpen] = useState(false)
 
-    const onChange = useCallback((filter?: GetTransfersQueryParamsTransferTypeEnumKey) => {
+    const onChange = useCallback((filter?: GetTransfersTransferTypeKey) => {
         onFilterChange?.(filter)
         setOpen(false)
     }, [onFilterChange])
@@ -79,7 +81,13 @@ export function TransferFilter({ children, filter: filterProp, onFilterChange }:
     return (
         <TransferFilterContext.Provider value={{ filter, setFilter }}>
             {children(() => setOpen(true))}
-            <FamilyDrawerRoot views={minimalViews} open={open} onOpenChange={setOpen}>
+            <FamilyDrawerRoot
+                views={minimalViews}
+                open={open}
+                onOpenChange={setOpen}
+                title="Transfer filter"
+                description="Choose which transfer types to display"
+            >
                 <FamilyDrawerPortal>
                     <FamilyDrawerOverlay />
                     <FamilyDrawerContent>

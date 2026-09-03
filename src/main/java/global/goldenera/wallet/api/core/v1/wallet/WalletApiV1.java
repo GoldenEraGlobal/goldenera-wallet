@@ -38,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 import global.goldenera.cryptoj.datatypes.Address;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.MempoolRecommendedFeesDtoV1;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.TokenDtoV1;
+import global.goldenera.wallet.api.core.v1.wallet.dtos.TransactionStatusDtoV1;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.TxSubmitDtoV1;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.UnifiedTransferPageDtoV1;
 import global.goldenera.wallet.api.core.v1.wallet.dtos.WalletBalanceDtoV1;
@@ -46,10 +47,15 @@ import global.goldenera.wallet.client.node.model.v1.MempoolResult;
 import global.goldenera.wallet.service.business.WalletBusinessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 
 /**
  * Wallet API for balance and transfer history.
@@ -65,10 +71,10 @@ public class WalletApiV1 {
     WalletBusinessService walletBusinessService;
 
     @GetMapping("/balances")
-    @Operation(summary = "Get wallet balances", description = "Get balances for multiple addresses")
+    @Operation(summary = "Get wallet balances", description = "Get total, locked, spendable and available balances for 1–100 addresses; large results must be narrowed")
     public List<WalletBalanceDtoV1> getBalances(
-            @Parameter(description = "Wallet addresses") @RequestParam Set<Address> addresses,
-            @Parameter(description = "Token addresses (optional, null for native token)") @RequestParam(required = false) Set<Address> tokenAddresses) {
+            @Parameter(description = "1–100 wallet addresses; an empty list is rejected") @RequestParam Set<Address> addresses,
+            @Parameter(description = "At most 100 token addresses (optional; omitted means all tokens)") @RequestParam(required = false) Set<Address> tokenAddresses) {
 
         log.debug("Getting balances for {} addresses", addresses.size());
 
@@ -78,11 +84,11 @@ public class WalletApiV1 {
     @GetMapping("/transfers")
     @Operation(summary = "Get transfer history", description = "Get unified transfer history (pending first, then confirmed)")
     public UnifiedTransferPageDtoV1 getTransfers(
-            @Parameter(description = "Wallet addresses") @RequestParam Set<Address> addresses,
-            @Parameter(description = "Token addresses (optional, null for all tokens)") @RequestParam(required = false) Set<Address> tokenAddresses,
+            @Parameter(description = "1–100 wallet addresses; an empty list is rejected") @RequestParam Set<Address> addresses,
+            @Parameter(description = "At most 100 token addresses (optional; omitted means all tokens)") @RequestParam(required = false) Set<Address> tokenAddresses,
             @Parameter(description = "Transfer type (optional, null for all types)") @RequestParam(required = false) TransferTypeEnum transferType,
-            @Parameter(description = "Page number (0-indexed)") @RequestParam(defaultValue = "0") int pageNumber,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int pageSize) {
+            @Parameter(description = "Page number (0-indexed; pageNumber × pageSize must not exceed 100000)") @RequestParam(defaultValue = "0") int pageNumber,
+            @Parameter(description = "Page size, 1–100") @RequestParam(defaultValue = "20") int pageSize) {
 
         log.debug("Getting transfers for {} addresses, page {}/{}", addresses.size(), pageNumber, pageSize);
 
@@ -109,19 +115,37 @@ public class WalletApiV1 {
 
     @GetMapping("/next-nonce")
     @Operation(summary = "Get next nonce", description = "Get next nonce for a given address")
+    @ApiResponse(responseCode = "200", description = "Canonical non-negative decimal next nonce",
+            content = @Content(schema = @Schema(type = "string", pattern = "^(0|[1-9][0-9]*)$")))
     public String getNextNonce(
             @Parameter(description = "Address") @RequestParam Address address) {
 
         log.debug("Getting next nonce for address: {}", address);
 
-        return walletBusinessService.getNextNonce(address).toString();
+        return walletBusinessService.getNextNonce(address);
+    }
+
+    @GetMapping("/transaction-status")
+    @Operation(summary = "Observe transaction status",
+            description = "Observe a previously signed transaction without submitting or replaying it")
+    public TransactionStatusDtoV1 getTransactionStatus(
+            @Parameter(description = "Canonical lowercase transaction hash", required = true,
+                    schema = @Schema(type = "string", pattern = "^0x[0-9a-f]{64}$"))
+            @RequestParam String hash,
+            @Parameter(description = "Transaction sender", required = true,
+                    schema = @Schema(type = "string", pattern = "^0x[0-9a-fA-F]{40}$"))
+            @RequestParam Address sender,
+            @Parameter(description = "Canonical uint256 decimal nonce", required = true,
+                    schema = @Schema(type = "string", pattern = "^(0|[1-9][0-9]*)$", maxLength = 78))
+            @RequestParam @Size(max = 78) String nonce) {
+        return walletBusinessService.getTransactionStatus(hash, sender, nonce);
     }
 
     @PostMapping("/submit-tx")
     @Operation(summary = "Submit transaction", description = "Submit a transaction")
     public MempoolResult submitTransaction(
-            @Parameter(description = "Transaction details") @RequestBody TxSubmitDtoV1 input) {
-        log.debug("Submitting transaction: {}", input);
+            @Parameter(description = "Transaction details") @RequestBody @Valid TxSubmitDtoV1 input) {
+        log.debug("Submitting transaction");
         return walletBusinessService.submitTransaction(input.hexData());
     }
 

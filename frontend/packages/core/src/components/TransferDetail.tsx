@@ -44,11 +44,11 @@ export function TransferDetail({
     const token = data?.find((token) => compareAddress(token.address, transfer?.tokenAddress))
     const nativeToken = data?.find((token) => isNativeToken(token.address))
     const tokenSymbol = token?.smallestUnitName || nativeToken?.smallestUnitName || ''
-    const tokenDecimals = token?.numberOfDecimals || nativeToken?.numberOfDecimals || 8
+    const tokenDecimals = token?.numberOfDecimals ?? nativeToken?.numberOfDecimals ?? 8
     const tokenName = token?.name || nativeToken?.name || ''
     const nativeTokenSymbol = nativeToken?.smallestUnitName || ''
-    const nativeTokenDecimals = nativeToken?.numberOfDecimals || 8
-    const nativeTokenName = nativeToken?.name || ''
+    const nativeTokenDecimals = nativeToken?.numberOfDecimals ?? 8
+
 
     // Determine transfer direction
     const getTransferDirection = (): TransferDirection => {

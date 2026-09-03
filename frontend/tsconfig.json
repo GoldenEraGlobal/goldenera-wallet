@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -13,17 +17,27 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "declaration": true,
-    "declarationMap": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "verbatimModuleSyntax": true,
-    "baseUrl": ".",
     "paths": {
-      "@project/core": ["packages/core/src"],
-      "@project/ui": ["packages/ui/src"]
-    }
-  },
-  "references": [{ "path": "./packages/core" }, { "path": "./packages/ui" }]
+      "@project/api": [
+        "./packages/api/src/index.ts"
+      ],
+      "@project/api/client": [
+        "./packages/api/src/client.ts"
+      ],
+      "@project/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@project/ui": [
+        "./packages/ui/src/index.ts"
+      ]
+    },
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  }
 }

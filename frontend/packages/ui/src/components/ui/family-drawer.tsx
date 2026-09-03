@@ -1,17 +1,18 @@
-import { mergeProps } from "@base-ui/react/merge-props"
-import { useRender } from "@base-ui/react/use-render"
-import clsx from "clsx"
-import { AnimatePresence, motion } from "motion/react"
+import { mergeProps } from '@base-ui/react/merge-props'
+import { Drawer } from '@base-ui/react/drawer'
+import { useRender } from '@base-ui/react/use-render'
+import clsx from 'clsx'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
   useRef,
   useState,
   type ReactNode,
-} from "react"
-import useMeasure from "react-use-measure"
-import { Drawer } from "vaul-base"
+} from 'react'
+import useMeasure from 'react-use-measure'
 
 // ============================================================================
 // Types
@@ -35,6 +36,8 @@ interface FamilyDrawerContextValue {
   elementRef: ReturnType<typeof useMeasure>[0]
   bounds: ReturnType<typeof useMeasure>[1]
   views: ViewsRegistry | undefined
+  title: string
+  description: string
 }
 
 const FamilyDrawerContext = createContext<FamilyDrawerContextValue | undefined>(
@@ -45,7 +48,7 @@ function useFamilyDrawer() {
   const context = useContext(FamilyDrawerContext)
   if (!context) {
     throw new Error(
-      "FamilyDrawer components must be used within FamilyDrawerRoot"
+      'FamilyDrawer components must be used within FamilyDrawerRoot'
     )
   }
   return context
@@ -63,6 +66,8 @@ interface FamilyDrawerRootProps {
   defaultView?: string
   onViewChange?: (view: string) => void
   views?: ViewsRegistry
+  title: string
+  description: string
 }
 
 function FamilyDrawerRoot({
@@ -70,9 +75,11 @@ function FamilyDrawerRoot({
   open: controlledOpen,
   defaultOpen = false,
   onOpenChange,
-  defaultView = "default",
+  defaultView = 'default',
   onViewChange,
   views: customViews,
+  title,
+  description,
 }: FamilyDrawerRootProps) {
   const [internalOpen, setInternalOpen] = useState(defaultOpen)
   const [view, setView] = useState(defaultView)
@@ -80,7 +87,7 @@ function FamilyDrawerRoot({
   const previousHeightRef = useRef<number>(0)
 
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
-  const setIsOpen = onOpenChange || setInternalOpen
+  const isControlled = controlledOpen !== undefined
 
   const opacityDuration = useMemo(() => {
     const currentHeight = bounds.height
@@ -105,10 +112,16 @@ function FamilyDrawerRoot({
     return duration
   }, [bounds.height])
 
-  const handleViewChange = (newView: string) => {
+  const handleViewChange = useCallback((newView: string) => {
     setView(newView)
     onViewChange?.(newView)
-  }
+  }, [onViewChange])
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    if (!isControlled) setInternalOpen(nextOpen)
+    if (!nextOpen) handleViewChange(defaultView)
+    onOpenChange?.(nextOpen)
+  }, [defaultView, handleViewChange, isControlled, onOpenChange])
 
   // Use custom views if provided, otherwise pass undefined
   const views =
@@ -122,11 +135,18 @@ function FamilyDrawerRoot({
     elementRef,
     bounds,
     views,
+    title,
+    description,
   }
 
   return (
     <FamilyDrawerContext.Provider value={contextValue}>
-      <Drawer.Root open={isOpen} onOpenChange={setIsOpen}>
+      <Drawer.Root
+        data-slot="drawer"
+        open={isOpen}
+        onOpenChange={handleOpenChange}
+        swipeDirection="down"
+      >
         {children}
       </Drawer.Root>
     </FamilyDrawerContext.Provider>
@@ -137,24 +157,23 @@ function FamilyDrawerRoot({
 // Trigger Component
 // ============================================================================
 
-interface FamilyDrawerTriggerProps extends useRender.ComponentProps<'button'> {
-}
+type FamilyDrawerTriggerProps = useRender.ComponentProps<'button'>
 
 function FamilyDrawerTrigger(props: FamilyDrawerTriggerProps) {
-  const { render, ...otherProps } = props;
+  const { render, ...otherProps } = props
 
   const element = useRender({
     defaultTagName: 'button',
     render,
     props: mergeProps<'button'>({
       className: clsx(
-        "fixed top-1/2 left-1/2 antialiased -translate-y-1/2 -translate-x-1/2 h-[44px] rounded-full border bg-background px-4 py-2 font-medium text-foreground transition-colors hover:bg-accent focus-visible:shadow-focus-ring-button md:font-medium cursor-pointer",
+        'fixed top-1/2 left-1/2 antialiased -translate-y-1/2 -translate-x-1/2 h-[44px] rounded-full border bg-background px-4 py-2 font-medium text-foreground transition-colors hover:bg-accent focus-visible:shadow-focus-ring-button md:font-medium cursor-pointer',
       ),
       type: 'button'
     }, otherProps),
-  });
+  })
 
-  return <Drawer.Trigger render={element} />;
+  return <Drawer.Trigger render={element} />
 }
 
 // ============================================================================
@@ -162,7 +181,7 @@ function FamilyDrawerTrigger(props: FamilyDrawerTriggerProps) {
 // ============================================================================
 
 function FamilyDrawerPortal({ children }: { children: ReactNode }) {
-  return <Drawer.Portal>{children}</Drawer.Portal>
+  return <Drawer.Portal data-slot="drawer-portal">{children}</Drawer.Portal>
 }
 
 // ============================================================================
@@ -178,9 +197,13 @@ function FamilyDrawerOverlay({ className, onClick }: FamilyDrawerOverlayProps) {
   const { setView } = useFamilyDrawer()
 
   return (
-    <Drawer.Overlay
-      className={clsx("fixed inset-0 z-50 bg-black/30", className)}
-      onClick={onClick || (() => setView("default"))}
+    <Drawer.Backdrop
+      data-slot="drawer-overlay"
+      className={clsx(
+        'fixed inset-0 z-50 min-h-dvh bg-black/30 transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] data-starting-style:opacity-0 data-ending-style:pointer-events-none data-ending-style:opacity-0 data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute',
+        className
+      )}
+      onClick={onClick || (() => setView('default'))}
     />
   )
 }
@@ -194,34 +217,46 @@ interface FamilyDrawerContentProps extends useRender.ComponentProps<'div'> {
 }
 
 function FamilyDrawerContent(props: FamilyDrawerContentProps) {
-  const { render, children, ...otherProps } = props;
-  const { bounds } = useFamilyDrawer()
+  const { render, children, ...otherProps } = props
+  const { bounds, title, description } = useFamilyDrawer()
 
   const element = useRender({
     defaultTagName: 'div',
     render,
     props: mergeProps<'div'>({
       className: clsx(
-        "fixed inset-x-4 bottom-4 z-50 mx-auto max-w-[361px] overflow-hidden rounded-[36px] bg-background outline-none md:mx-auto md:w-full",
+        'group/drawer-popup pointer-events-auto fixed inset-x-4 bottom-4 z-50 mx-auto max-h-[calc(100dvh-2rem)] max-w-[361px] overflow-hidden rounded-[36px] bg-background transition-[transform,height,opacity,filter] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform outline-none select-none transform-[translate3d(0,var(--drawer-swipe-movement-y),0)] data-starting-style:transform-[translate3d(0,calc(100%+1rem),0)] data-ending-style:transform-[translate3d(0,calc(100%+1rem),0)] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-swiping:duration-0 data-nested-drawer-open:brightness-95 md:w-full',
       ),
     }, otherProps),
-  });
+  })
 
   return (
-    <Drawer.Content render={element}>
-      <motion.div
-        animate={{
-          height: bounds.height,
-          transition: {
-            duration: 0.27,
-            ease: [0.25, 1, 0.5, 1],
-          },
-        }}
-      >
-        {children}
-      </motion.div>
-    </Drawer.Content>
-  );
+    <Drawer.Viewport
+      data-slot="drawer-viewport"
+      className="pointer-events-none fixed inset-0 z-50 select-none"
+    >
+      <Drawer.Popup data-slot="drawer-popup" data-swipe-axis="y" render={element}>
+        <Drawer.Content
+          data-slot="drawer-content"
+          className="flex min-h-0 flex-col overflow-hidden overscroll-contain rounded-[inherit] select-text group-data-swiping/drawer-popup:select-none"
+        >
+          <Drawer.Title className="sr-only">{title}</Drawer.Title>
+          <Drawer.Description className="sr-only">{description}</Drawer.Description>
+          <motion.div
+            animate={{
+              height: bounds.height,
+              transition: {
+                duration: 0.27,
+                ease: [0.25, 1, 0.5, 1],
+              },
+            }}
+          >
+            {children}
+          </motion.div>
+        </Drawer.Content>
+      </Drawer.Popup>
+    </Drawer.Viewport>
+  )
 }
 
 // ============================================================================
@@ -242,7 +277,7 @@ function FamilyDrawerAnimatedWrapper({
   return (
     <div
       ref={elementRef}
-      className={clsx("px-6 pb-6 pt-2.5 antialiased", className)}
+      className={clsx('px-6 pb-6 pt-2.5 antialiased', className)}
     >
       {children}
     </div>
@@ -284,29 +319,28 @@ function FamilyDrawerAnimatedContent({
 // Close Component
 // ============================================================================
 
-interface FamilyDrawerCloseProps extends useRender.ComponentProps<'button'> {
-}
+type FamilyDrawerCloseProps = useRender.ComponentProps<'button'>
 
 function FamilyDrawerClose(props: FamilyDrawerCloseProps) {
-  const { render, children, ...otherProps } = props;
+  const { render, children, ...otherProps } = props
 
   const element = useRender({
     defaultTagName: 'button',
     render,
     props: mergeProps<'button'>({
       className: clsx(
-        "absolute right-8 top-7 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-75 cursor-pointer",
+        'absolute right-8 top-7 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-75 cursor-pointer',
       ),
-      ...{ 'data-vaul-no-drag': '' },
+      ...{ 'data-base-ui-swipe-ignore': '' },
       type: 'button'
     }, otherProps),
-  });
+  })
 
   return (
     <Drawer.Close render={element}>
       {children || <CloseIcon />}
     </Drawer.Close>
-  );
+  )
 }
 
 // ============================================================================
@@ -327,7 +361,7 @@ function FamilyDrawerHeader({
   className,
 }: FamilyDrawerHeaderProps) {
   return (
-    <header className={clsx("mt-[21px]", className)}>
+    <header className={clsx('mt-[21px]', className)}>
       {icon}
       <h2 className="mt-2.5 text-[22px] font-semibold text-foreground md:font-medium">
         {title}
@@ -339,46 +373,44 @@ function FamilyDrawerHeader({
   )
 }
 
-interface FamilyDrawerButtonProps extends useRender.ComponentProps<'button'> {
-}
+type FamilyDrawerButtonProps = useRender.ComponentProps<'button'>
 
 function FamilyDrawerButton(props: FamilyDrawerButtonProps) {
-  const { render, ...otherProps } = props;
+  const { render, ...otherProps } = props
 
   const element = useRender({
     defaultTagName: 'button',
     render,
     props: mergeProps<'button'>({
       className: clsx(
-        "flex h-12 w-full items-center gap-[15px] rounded-[16px] bg-muted px-4 text-md font-medium text-foreground transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-95 md:font-medium cursor-pointer aria-selected:bg-primary aria-selected:text-primary-foreground",
+        'flex h-12 w-full items-center gap-[15px] rounded-[16px] bg-muted px-4 text-md font-medium text-foreground transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-95 md:font-medium cursor-pointer aria-selected:bg-primary aria-selected:text-primary-foreground',
       ),
-      ...{ 'data-vaul-no-drag': '' },
+      ...{ 'data-base-ui-swipe-ignore': '' },
       type: 'button'
     }, otherProps),
-  });
+  })
 
-  return element;
+  return element
 }
 
-interface FamilyDrawerSecondaryButtonProps extends useRender.ComponentProps<'button'> {
-}
+type FamilyDrawerSecondaryButtonProps = useRender.ComponentProps<'button'>
 
 function FamilyDrawerSecondaryButton(props: FamilyDrawerSecondaryButtonProps) {
-  const { render, ...otherProps } = props;
+  const { render, ...otherProps } = props
 
   const element = useRender({
     defaultTagName: 'button',
     render,
     props: mergeProps<'button'>({
       className: clsx(
-        "flex h-12 w-full items-center justify-center gap-[15px] rounded-full text-center text-[19px] font-semibold transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-95 md:font-medium cursor-pointer",
+        'flex h-12 w-full items-center justify-center gap-[15px] rounded-full text-center text-[19px] font-semibold transition-transform focus:scale-95 focus-visible:shadow-focus-ring-button active:scale-95 md:font-medium cursor-pointer',
       ),
-      ...{ 'data-vaul-no-drag': '' },
+      ...{ 'data-base-ui-swipe-ignore': '' },
       type: 'button'
     }, otherProps),
-  });
+  })
 
-  return element;
+  return element
 }
 
 // ============================================================================
@@ -401,7 +433,7 @@ function FamilyDrawerViewContent(
 
   if (!views) {
     throw new Error(
-      "FamilyDrawerViewContent requires views to be provided via props or FamilyDrawerRoot"
+      'FamilyDrawerViewContent requires views to be provided via props or FamilyDrawerRoot'
     )
   }
 
@@ -456,4 +488,3 @@ export {
   FamilyDrawerAnimatedContent, FamilyDrawerAnimatedWrapper, FamilyDrawerButton, FamilyDrawerClose, FamilyDrawerContent, FamilyDrawerHeader, FamilyDrawerOverlay, FamilyDrawerPortal, FamilyDrawerRoot, FamilyDrawerSecondaryButton, FamilyDrawerTrigger, FamilyDrawerViewContent,
   useFamilyDrawer, type ViewComponent, type ViewsRegistry
 }
-

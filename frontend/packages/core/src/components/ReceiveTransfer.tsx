@@ -1,6 +1,6 @@
 import { Share } from '@capacitor/share'
 import { NATIVE_TOKEN } from '@goldenera/cryptoj'
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
+import { standardSchemaResolver } from '@hookform/resolvers/standard-schema'
 import { useGetTokensHook } from '@project/api'
 import {
     Avatar,
@@ -27,7 +27,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { CustomQRCode } from "custom-qr-code/react"
+import { CustomQRCode } from 'custom-qr-code/react'
 import {
     Copy,
     Download,
@@ -35,28 +35,17 @@ import {
     X
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Controller, useForm } from "react-hook-form"
-import { NumericFormat } from "react-number-format"
-import z from "zod"
+import { Controller, useForm } from 'react-hook-form'
+import { NumericFormat } from 'react-number-format'
+import z from 'zod'
 import { useCopy } from '../hooks/useCopy'
 import { useShareSupported } from '../hooks/useShareSupported'
 import { useWalletStore } from '../store/WalletStore'
 import { qrToString } from '../utils/QrUtil'
+import { parseTokenAmount } from '../utils/TokenAmount'
 import { compareAddress, formatWei } from '../utils/WalletUtil'
 
-const amountSchema = z.object({
-    amount: z.string().refine((value) => {
-        if (!value || value === '') {
-            return true
-        }
-        try {
-            return parseFloat(value) > 0
-        } catch {
-            return false
-        }
-    }, 'Amount must be greater than 0')
-})
-
+const amountSchema = z.object({ amount: z.string() })
 type AmountFormValues = z.infer<typeof amountSchema>
 
 interface SetAmountDialogProps {
@@ -65,12 +54,17 @@ interface SetAmountDialogProps {
     onConfirm: (amount: string) => void
     initialAmount?: string
     tokenSymbol?: string
-    tokenDecimals?: number
+    tokenDecimals: number
 }
 
-function SetAmountDialog({ open, onOpenChange, onConfirm, initialAmount, tokenSymbol, tokenDecimals = 8 }: SetAmountDialogProps) {
+function SetAmountDialog({ open, onOpenChange, onConfirm, initialAmount, tokenSymbol, tokenDecimals }: SetAmountDialogProps) {
     const form = useForm<AmountFormValues>({
-        resolver: standardSchemaResolver(amountSchema),
+        resolver: standardSchemaResolver(amountSchema.superRefine(({ amount }, context) => {
+            if (amount === '') return
+            try { parseTokenAmount(amount, tokenDecimals) } catch (error) {
+                context.addIssue({ code: 'custom', path: ['amount'], message: error instanceof Error ? error.message : 'Invalid amount' })
+            }
+        })),
         defaultValues: {
             amount: initialAmount || ''
         }
@@ -107,7 +101,6 @@ function SetAmountDialog({ open, onOpenChange, onConfirm, initialAmount, tokenSy
                                     placeholder={formatWei('0', tokenDecimals)}
                                     allowNegative={false}
                                     thousandSeparator=","
-                                    decimalScale={tokenDecimals}
                                     decimalSeparator="."
                                     allowedDecimalSeparators={['.', ',']}
                                     inputMode="decimal"
@@ -143,12 +136,13 @@ interface ReceiveTransferProps {
 export function ReceiveTransfer({
     children,
 }: ReceiveTransferProps) {
-    const { copy, copied } = useCopy()
-    const { copy: copyQr, copied: copiedQr } = useCopy()
+    const { copy, copied, copyFailed } = useCopy()
+    const { copy: copyQr, copied: copiedQr, copyFailed: copyQrFailed } = useCopy()
     const address = useWalletStore((state) => state.address)
     const { data: tokens } = useGetTokensHook()
     const [tokenAddress, setTokenAddress] = useState<string>(NATIVE_TOKEN)
     const token = tokens?.find((token) => compareAddress(token.address, tokenAddress))
+    const tokenDecimals = token?.numberOfDecimals
     const [amount, setAmount] = useState<string | undefined>(undefined)
     const [open, setOpen] = useState(false)
     const qrStrData = useMemo(() => {
@@ -241,7 +235,7 @@ export function ReceiveTransfer({
                             </div>
 
                             <div className="flex items-center justify-center">
-                                <Tooltip open={copied}>
+                                <Tooltip open={copied || copyFailed}>
                                     <TooltipTrigger onClick={copyAddress} render={<div className='bg-white overflow-hidden rounded-lg flex flex-col items-center pb-5'>
                                         <CustomQRCode
                                             width={220}
@@ -262,23 +256,30 @@ export function ReceiveTransfer({
                                         </span>
                                     </div>} />
                                     <TooltipContent>
-                                        <p>{copiedQr ? 'Copied address' : 'Copy address'}</p>
+                                        <p role="status">{copyFailed ? 'Copy failed' : copied ? 'Copied address' : 'Copy address'}</p>
                                     </TooltipContent>
                                 </Tooltip>
 
                             </div>
                             <div className="flex items-center w-full gap-3">
-                                <Tooltip open={copiedQr}>
+                                <Tooltip open={copiedQr || copyQrFailed}>
                                     <TooltipTrigger onClick={copyQrAddress} render={<Button size="lg" variant="outline" className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0">
                                         <Copy className="h-5 w-5" />
                                         <span className="text-xs">Copy</span>
                                     </Button>} />
                                     <TooltipContent>
-                                        <p>{copiedQr ? 'Copied address' : 'Copy address'}</p>
+                                        <p role="status">{copyQrFailed ? 'Copy failed' : copiedQr ? 'Copied address' : 'Copy address'}</p>
                                     </TooltipContent>
                                 </Tooltip>
 
-                                <Button size="lg" variant="outline" className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0" onClick={openAmountDialog}>
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    className="flex-col h-auto py-2.5 gap-1 flex-1 min-w-0"
+                                    onClick={openAmountDialog}
+                                    disabled={tokenDecimals === undefined}
+                                    aria-label={tokenDecimals === undefined ? 'Set amount unavailable until token details load' : 'Set amount'}
+                                >
                                     <Download className="h-5 w-5" />
                                     <span className="text-xs">Set amount</span>
                                 </Button>
@@ -301,14 +302,16 @@ export function ReceiveTransfer({
                     </DrawerFooter>
                 </DrawerContent>
             </Drawer>
-            <SetAmountDialog
-                open={isAmountDialogOpen}
-                onOpenChange={setIsAmountDialogOpen}
-                onConfirm={handleAmountConfirm}
-                initialAmount={amount}
-                tokenSymbol={token?.smallestUnitName}
-                tokenDecimals={token?.numberOfDecimals ?? 8}
-            />
+            {tokenDecimals !== undefined && (
+                <SetAmountDialog
+                    open={isAmountDialogOpen}
+                    onOpenChange={setIsAmountDialogOpen}
+                    onConfirm={handleAmountConfirm}
+                    initialAmount={amount}
+                    tokenSymbol={token?.smallestUnitName}
+                    tokenDecimals={tokenDecimals}
+                />
+            )}
         </>
     )
 }

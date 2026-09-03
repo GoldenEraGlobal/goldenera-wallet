@@ -1,9 +1,15 @@
 import { SplashScreen } from '@capacitor/splash-screen'
-import { createApp } from '@project/core'
+import { configureWalletResetBarrier, createApp } from '@project/core'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
+import { installPwaWalletResetAttestation, preparePwaWalletReset } from './WalletResetBarrierClient'
 import './index.css'
+
+// Install the capability responder before service-worker registration or app
+// initialization so a reset gate can identify this bundle immediately.
+installPwaWalletResetAttestation()
+configureWalletResetBarrier(preparePwaWalletReset)
 
 // PWA Auto-update: Automatically update when new version is available
 // This will immediately activate the new service worker without requiring user interaction

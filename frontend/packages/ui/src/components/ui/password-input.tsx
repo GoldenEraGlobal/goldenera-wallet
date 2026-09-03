@@ -1,9 +1,9 @@
-"use client"
+'use client'
 
-import { Eye, EyeOff } from "lucide-react"
-import * as React from "react"
+import { Eye, EyeOff } from 'lucide-react'
+import * as React from 'react'
 
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "./input-group"
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from './input-group'
 
 interface PasswordInputProps extends Omit<React.ComponentProps<typeof InputGroupInput>, 'type'> {
     showPasswordButton?: boolean
@@ -15,7 +15,7 @@ function PasswordInput({ showPasswordButton = true, className, ...props }: Passw
     return (
         <InputGroup className={className}>
             <InputGroupInput
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 autoComplete="off"
                 {...props}
             />
@@ -24,7 +24,7 @@ function PasswordInput({ showPasswordButton = true, className, ...props }: Passw
                     <InputGroupButton
                         size="icon-xs"
                         onClick={() => setShowPassword(!showPassword)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </InputGroupButton>

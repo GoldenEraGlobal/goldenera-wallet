@@ -1,6 +1,6 @@
-import { Preferences } from '@capacitor/preferences';
-import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
-import { CryptoUtil } from '../utils/CryptoUtil';
+import { Preferences } from '@capacitor/preferences'
+import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin'
+import { CryptoUtil } from '../utils/CryptoUtil'
 
 export interface SecureStorageOptions {
     password?: string
@@ -46,52 +46,32 @@ class SecureStorageServiceImpl implements SecureStorageAdapter {
     }
 
     async get(key: string, options?: SecureStorageOptions): Promise<string | null> {
-        try {
-            const { value } = await SecureStoragePlugin.get({ key: this.getFullKey(key) })
-
-            if (!value) {
-                return null
-            }
-
-            if (options?.password) {
-                return await CryptoUtil.decrypt(value, options.password)
-            }
-
-            return value
-        } catch (error) {
-            return null
-        }
+        if (!await this.exists(key)) return null
+        const { value } = await SecureStoragePlugin.get({ key: this.getFullKey(key) })
+        // A present empty string is still persisted bytes. Return it so the
+        // wallet-vault parser can classify it as corruption rather than absence.
+        if (value === null) throw new Error('Stored wallet data is unreadable')
+        return options?.password ? CryptoUtil.decrypt(value, options.password) : value
     }
 
     async exists(key: string): Promise<boolean> {
-        try {
-            const { value: keys } = await SecureStoragePlugin.keys()
-            const exists = keys.includes(this.getFullKey(key))
-            return exists
-        } catch (error) {
-            return false
-        }
+        const { value: keys } = await SecureStoragePlugin.keys()
+        return keys.includes(this.getFullKey(key))
     }
 
     async remove(key: string): Promise<void> {
-        try {
-            await SecureStoragePlugin.remove({ key: this.getFullKey(key) })
-        } catch {
-            // Ignore if key doesn't exist
-        }
+        if (!await this.exists(key)) return
+        await SecureStoragePlugin.remove({ key: this.getFullKey(key) })
+        if (await this.exists(key)) throw new Error('Secure storage did not remove the requested value')
     }
 
     async clear(): Promise<void> {
-        try {
-            const { value: keys } = await SecureStoragePlugin.keys()
-            const keysToRemove = keys.filter((k) => k.startsWith(SECURE_PREFIX))
-
-            for (const key of keysToRemove) {
-                await SecureStoragePlugin.remove({ key })
-            }
-        } catch (error) {
+        const { value: keys } = await SecureStoragePlugin.keys()
+        for (const key of keys.filter(value => value.startsWith(SECURE_PREFIX))) {
+            await this.remove(key.slice(SECURE_PREFIX.length))
         }
     }
+
 }
 
 class BasicStorageServiceImpl implements BasicStorageAdapter {
@@ -119,6 +99,8 @@ class BasicStorageServiceImpl implements BasicStorageAdapter {
 
     async removeItem(key: string): Promise<void> {
         await Preferences.remove({ key: this.getFullKey(key) })
+        const { value } = await Preferences.get({ key: this.getFullKey(key) })
+        if (value !== null) throw new Error('Storage did not remove the requested value')
     }
 
     async clear(): Promise<void> {
@@ -126,7 +108,7 @@ class BasicStorageServiceImpl implements BasicStorageAdapter {
         const keysToRemove = keys.filter((k) => k.startsWith(BASIC_PREFIX))
 
         for (const key of keysToRemove) {
-            await Preferences.remove({ key })
+            await this.removeItem(key.slice(BASIC_PREFIX.length))
         }
     }
 }

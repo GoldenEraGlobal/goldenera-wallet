@@ -24,6 +24,7 @@
 package global.goldenera.wallet.repositories;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,8 +44,65 @@ public interface DeviceRepository
                 ListPagingAndSortingRepository<Device, UUID>,
                 JpaSpecificationExecutor<Device> {
 
-        @Query("SELECT d.id FROM Device d WHERE d.lastSeenAt < :threshold")
-        List<UUID> findIdsByLastSeenAtBefore(Instant threshold);
+        @Query(nativeQuery = true, value = """
+                        SELECT d.id
+                        FROM device d
+                        WHERE d.id IN :deviceIds
+                          AND d.last_seen_at < :threshold
+                        ORDER BY d.id
+                        FOR UPDATE OF d SKIP LOCKED
+                        """)
+        List<UUID> lockStaleIdsForCleanup(Collection<UUID> deviceIds, Instant threshold);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query(nativeQuery = true, value = """
+                        DELETE FROM device d
+                        WHERE d.id IN :deviceIds
+                          AND d.last_seen_at < :threshold
+                          AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM user_account ua
+                                  WHERE ua.device_id = d.id
+                          )
+                        """)
+        int deleteCleanupCandidatesWithoutAccounts(Collection<UUID> deviceIds, Instant threshold);
+
+        @Query(nativeQuery = true, value = """
+                        SELECT d.id
+                        FROM device d
+                        WHERE d.last_seen_at < :threshold
+                          AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM user_account ua
+                                  WHERE ua.device_id = d.id
+                          )
+                        ORDER BY d.id
+                        LIMIT :batchSize
+                        FOR UPDATE OF d SKIP LOCKED
+                        """)
+        List<UUID> lockStaleWithoutAccounts(Instant threshold, int batchSize);
+
+        @Query(nativeQuery = true, value = """
+                        SELECT EXISTS (
+                                SELECT 1
+                                FROM device d
+                                WHERE d.last_seen_at < :threshold
+                        )
+                        """)
+        boolean existsStaleForCleanup(Instant threshold);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query(nativeQuery = true, value = """
+                        DELETE FROM device d
+                        WHERE d.id IN :deviceIds
+                          AND d.last_seen_at < :threshold
+                          AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM user_account ua
+                                  WHERE ua.device_id = d.id
+                          )
+                        """)
+        int deleteLockedStaleWithoutAccounts(Collection<UUID> deviceIds, Instant threshold);
 
         Optional<Device> findByClientIdentifier(UUID clientIdentifier);
 

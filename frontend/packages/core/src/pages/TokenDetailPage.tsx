@@ -1,9 +1,12 @@
+import type { GetTransfersTransferTypeKey } from '@project/api'
 import {
-    GetTransfersQueryParamsTransferTypeEnumKey,
+    normalizeApiInteger,
     useGetBalancesHook,
     useGetTokenByAddressHook
 } from '@project/api'
 import {
+    Alert,
+    AlertDescription,
     Avatar,
     AvatarFallback,
     AvatarImage,
@@ -17,8 +20,9 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from "@stackflow/react"
+import type { ActivityComponentType } from '@stackflow/react'
 import {
+    AlertCircle,
     ArrowDownLeft,
     ArrowUpRight,
     CopyIcon,
@@ -40,17 +44,51 @@ export interface TokenDetailPageProps {
     tokenAddress: string
 }
 
-export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ params }) => {
+interface ParsedTokenHoldings {
+    holdings: string | null
+    malformed: boolean
+}
+
+const parseTokenHoldings = (value: unknown, tokenAddress: string): ParsedTokenHoldings => {
+    if (value === undefined) return { holdings: null, malformed: false }
+    if (!Array.isArray(value)) return { holdings: null, malformed: true }
+    if (value.length === 0) return { holdings: '0', malformed: false }
+    if (value.length !== 1) return { holdings: null, malformed: true }
+
+    const row = value[0]
+    if (!row || typeof row !== 'object') return { holdings: null, malformed: true }
+    const balance = row as Record<string, unknown>
+    if (typeof balance.tokenAddress !== 'string' ||
+        balance.tokenAddress.toLowerCase() !== tokenAddress.toLowerCase()) {
+        return { holdings: null, malformed: true }
+    }
+
+    try {
+        return {
+            holdings: normalizeApiInteger(balance.totalBalance, 'totalBalance'),
+            malformed: false,
+        }
+    } catch {
+        return { holdings: null, malformed: true }
+    }
+}
+
+export const TokenDetailPage: ActivityComponentType<'TokenDetailPage'> = ({ params }) => {
     const { push } = useFlow()
-    const { copy, copied } = useCopy()
+    const { copy, copied, copyFailed } = useCopy()
     const { tokenAddress } = params
     const address = useWalletStore((state) => state.address)
-    const [transferFilter, setTransferFilter] = useState<GetTransfersQueryParamsTransferTypeEnumKey | undefined>(undefined)
+    const [transferFilter, setTransferFilter] = useState<GetTransfersTransferTypeKey | undefined>(undefined)
     const supportedScan = useBarcodeIsSupported()
 
     // Fetch token info
-    const { data: tokenInfo, refetch: refetchTokenInfo } = useGetTokenByAddressHook(
-        { address: tokenAddress },
+    const {
+        data: tokenInfo,
+        isLoading: isLoadingTokenInfo,
+        isError: isTokenInfoError,
+        refetch: refetchTokenInfo,
+    } = useGetTokenByAddressHook(
+        { query: { address: tokenAddress } },
         {
             query: {
                 enabled: !!tokenAddress,
@@ -60,11 +98,16 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
     )
 
     // Fetch balance for this token
-    const { data: balances, isLoading: isLoadingBalance, refetch: refetchBalances } = useGetBalancesHook(
-        {
+    const {
+        data: balances,
+        isLoading: isLoadingBalance,
+        isError: isBalanceError,
+        refetch: refetchBalances,
+    } = useGetBalancesHook(
+        { query: {
             addresses: address ? [address] : [],
             tokenAddresses: [tokenAddress]
-        },
+        } },
         {
             query: {
                 enabled: !!address,
@@ -75,23 +118,30 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
 
     const copyAddress = async () => {
         if (address) {
-            copy(address)
+            await copy(address)
         }
     }
 
     // Get token details
     const tokenName = tokenInfo?.name || 'Token'
     const tokenSymbol = tokenInfo?.smallestUnitName || 'TKN'
-    const tokenDecimals = tokenInfo?.numberOfDecimals || 8
+    const tokenDecimals = tokenInfo?.numberOfDecimals
+
+    // A token's decimal count is required to interpret every raw amount. Never
+    // substitute a plausible-looking value while metadata is unavailable.
+    const isTokenMetadataLoading = tokenDecimals === undefined && isLoadingTokenInfo
+    const isTokenMetadataUnavailable = tokenDecimals === undefined && !isLoadingTokenInfo
 
     // Get balance
-    const balance = balances?.[0]?.balance || '0'
+    const parsedHoldings = parseTokenHoldings(balances, tokenAddress)
+    const holdings = isBalanceError && balances?.length === 0 ? null : parsedHoldings.holdings
+    const hasLoadError = isTokenInfoError || isBalanceError || parsedHoldings.malformed
 
     const renderTransferFilter = () => {
         return (
             <TransferFilter filter={transferFilter} onFilterChange={setTransferFilter}>
                 {(open) => (
-                    <Button variant="ghost" size="icon" onClick={open}>
+                    <Button aria-label="Filter transfers" variant="ghost" size="icon" onClick={open}>
                         <Filter className="h-5 w-5" />
                     </Button>
                 )}
@@ -109,6 +159,15 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
         <AppLayout title={tokenName} actionButton={renderTransferFilter()} onRefresh={onRefresh}>
             {/* Main Content */}
             <div className="flex-1 space-y-6">
+                {hasLoadError && (
+                    <Alert variant="destructive">
+                        <AlertCircle />
+                        <AlertDescription>
+                            Token details could not be refreshed. Check your connection and retry.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {/* Token Balance Card */}
                 <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
                     <CardContent className="text-center space-y-4">
@@ -119,11 +178,15 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
 
                         <div className="space-y-1">
                             <h2 className="text-lg font-bold tracking-tight">
-                                {isLoadingBalance ? (
+                                {isLoadingBalance || isTokenMetadataLoading ? (
                                     <Skeleton className="h-9 w-32 mx-auto" />
+                                ) : isTokenMetadataUnavailable ? (
+                                    <span className="text-base text-muted-foreground">Token details unavailable</span>
+                                ) : holdings === null ? (
+                                    <span className="text-base text-muted-foreground">Balance unavailable</span>
                                 ) : (
                                     <>
-                                        {formatWei(balance, tokenDecimals)}
+                                        {formatWei(holdings, tokenDecimals)}
                                         <span className="text-sm text-muted-foreground ml-2">{tokenSymbol}</span>
                                     </>
                                 )}
@@ -132,7 +195,7 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
                         </div>
 
                         <div className="flex items-center justify-center gap-2">
-                            <Tooltip open={copied}>
+                            <Tooltip open={copied || copyFailed}>
                                 <TooltipTrigger onClick={copyAddress} render={(props) => (
                                     <Badge className="font-mono" {...props}>
                                         {shortenAddress(address!)}
@@ -140,7 +203,7 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
                                     </Badge>
                                 )} />
                                 <TooltipContent>
-                                    <p>{copied ? 'Copied!' : 'Copy'}</p>
+                                    <p role="status">{copyFailed ? 'Copy failed' : copied ? 'Copied!' : 'Copy'}</p>
                                 </TooltipContent>
                             </Tooltip>
                         </div>
@@ -178,11 +241,17 @@ export const TokenDetailPage: ActivityComponentType<TokenDetailPageProps> = ({ p
                 <Separator />
 
                 {/* Transactions */}
-                <TransferList
-                    tokenAddress={tokenAddress}
-                    tokenDecimals={tokenDecimals}
-                    transferType={transferFilter}
-                />
+                {tokenDecimals === undefined ? (
+                    isTokenMetadataLoading
+                        ? <Skeleton className="h-28 w-full" />
+                        : <p className="text-sm text-muted-foreground text-center py-6">Transfer amounts are unavailable until token details load.</p>
+                ) : (
+                    <TransferList
+                        tokenAddress={tokenAddress}
+                        tokenDecimals={tokenDecimals}
+                        transferType={transferFilter}
+                    />
+                )}
             </div>
         </AppLayout>
     )

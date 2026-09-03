@@ -29,6 +29,7 @@ import global.goldenera.wallet.exceptions.GEValidationException;
 
 public class PaginationUtil {
 	public static final int MAX_PAGE_SIZE = 100;
+	public static final long MAX_PAGE_OFFSET = 100_000;
 
 	public static void validatePageRequest(int pageNumber, int pageSize) {
 		if (pageNumber < 0) {
@@ -38,6 +39,9 @@ public class PaginationUtil {
 			throw new GEValidationException(
 					String.format("Invalid page size (min 1, max %d).", MAX_PAGE_SIZE));
 		}
+        if ((long) pageNumber * pageSize > MAX_PAGE_OFFSET) {
+            throw new GEValidationException("Requested page offset exceeds 100000 rows");
+        }
 	}
 
 	public static void validateRangeRequest(long fromHeight, long toHeight, long maxRangeLimit) {

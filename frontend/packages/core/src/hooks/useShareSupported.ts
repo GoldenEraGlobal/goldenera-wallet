@@ -1,5 +1,5 @@
-import { Share } from "@capacitor/share";
-import { useEffect, useRef, useState } from "react";
+import { Share } from '@capacitor/share'
+import { useEffect, useRef, useState } from 'react'
 
 export const useShareSupported = () => {
     const isMounted = useRef(true)
@@ -9,17 +9,17 @@ export const useShareSupported = () => {
         isMounted.current = true
 
         const checkSupported = async () => {
-            const canShare = await Share.canShare();
+            const canShare = await Share.canShare()
             if (isMounted.current) {
-                setSupported(canShare.value);
+                setSupported(canShare.value)
             }
-        };
-        checkSupported();
+        }
+        checkSupported()
 
         return () => {
             isMounted.current = false
         }
-    }, []);
+    }, [])
 
 
     return supported

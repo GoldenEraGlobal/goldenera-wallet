@@ -9,13 +9,15 @@ import {
     PasswordInput,
     Spinner
 } from '@project/ui'
-import { ActivityComponentType } from '@stackflow/react'
+import type { ActivityComponentType } from '@stackflow/react'
 import { AlertTriangle, ChevronLeft, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { AppLayout } from '../layouts/Layouts'
 import { useFlow } from '../router/useFlow'
+import { WalletResetBarrierError } from '../services/WalletResetBarrierService'
+import { WalletVaultCorruptionError } from '../services/WalletVaultService'
 import { useWalletStore } from '../store/WalletStore'
 
 const deleteSchema = z.object({
@@ -26,10 +28,9 @@ type DeleteForm = z.infer<typeof deleteSchema>
 
 type Step = 'warning' | 'confirm'
 
-export const DeleteWalletPage: ActivityComponentType = () => {
-    const { pop } = useFlow()
+export const DeleteWalletPage: ActivityComponentType<'DeleteWalletPage'> = () => {
+    const { pop, push } = useFlow()
     const resetWallet = useWalletStore((state) => state.resetWallet)
-    const checkPassword = useWalletStore((state) => state.checkPassword)
     const [step, setStep] = useState<Step>('warning')
 
     const [hasBackedUp, setHasBackedUp] = useState(false)
@@ -49,19 +50,15 @@ export const DeleteWalletPage: ActivityComponentType = () => {
 
     const handleDelete = async (data: DeleteForm) => {
         try {
-            const mnemonic = await checkPassword(data.password)
-            if (!mnemonic) {
-                form.setError('password', {
-                    type: 'manual',
-                    message: 'Incorrect password',
-                })
-                return
-            }
-            await resetWallet()
-        } catch {
+            await resetWallet(data.password)
+        } catch (error) {
             form.setError('password', {
                 type: 'manual',
-                message: 'Failed to delete wallet',
+                message: error instanceof Error && error.message === 'Incorrect password'
+                    ? 'Incorrect password'
+                    : error instanceof WalletVaultCorruptionError || error instanceof WalletResetBarrierError
+                        ? error.message
+                        : 'Failed to delete wallet',
             })
         } finally {
             form.setValue('password', '')
@@ -93,13 +90,13 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                             <Alert variant="destructive" className="bg-destructive/5 border-destructive/20">
                                 <AlertTriangle />
                                 <AlertDescription className="text-sm text-left">
-                                    <strong className='font-bold'>Warning:</strong> Deleting your wallet will permanently remove all data from this device.
-                                    Without your recovery phrase, you will lose access to your funds forever.
+                                    <strong className='font-bold'>Warning:</strong> Deleting your wallet permanently removes the encrypted recovery phrase and local wallet access data.
+                                    Non-secret transaction recovery records may remain, including unreadable-state markers, so an uncertain submission is not replayed; importing the same address can remain blocked until it is reconciled or recovered. Without your recovery phrase, you will lose access to your funds forever.
                                 </AlertDescription>
                             </Alert>
                             <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
                                 <Checkbox
-                                    id="backup-confirm"
+                                    id="recovery-phrase-backed-up"
                                     checked={hasBackedUp}
                                     onCheckedChange={setHasBackedUp}
                                     className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
@@ -112,7 +109,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                             </Label>
                             <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
                                 <Checkbox
-                                    id="backup-confirm"
+                                    id="deletion-risk-understood"
                                     checked={understandRisk}
                                     onCheckedChange={setUnderstandRisk}
                                     className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
@@ -129,7 +126,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 variant="outline"
                                 size="lg"
                                 className="w-full"
-                                onClick={() => pop()}
+                                onClick={() => push('ShowPhrasePage', {})}
                             >
                                 View Recovery Phrase First
                             </Button>
@@ -172,7 +169,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 <PasswordInput
                                     placeholder="Enter your password"
                                     {...form.register('password')}
-                                    disabled={form.formState.disabled || form.formState.isLoading}
+                                    disabled={form.formState.disabled || form.formState.isSubmitting}
                                 />
                                 {form.formState.errors.password?.message && (
                                     <FieldError>{form.formState.errors.password.message}</FieldError>
@@ -184,11 +181,11 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 variant="destructive"
                                 size="lg"
                                 className="w-full"
-                                disabled={form.formState.disabled || form.formState.isLoading || !form.formState.isValid}
+                                disabled={form.formState.disabled || form.formState.isSubmitting || !form.formState.isValid}
                                 onClick={form.handleSubmit(handleDelete)}
                             >
-                                {form.formState.isLoading && <Spinner />}
-                                {form.formState.isLoading ? 'Deleting...' : 'Delete Wallet Permanently'}
+                                {form.formState.isSubmitting && <Spinner />}
+                                {form.formState.isSubmitting ? 'Deleting...' : 'Delete Wallet Permanently'}
                             </Button>
 
                             <Button
@@ -197,7 +194,7 @@ export const DeleteWalletPage: ActivityComponentType = () => {
                                 size="lg"
                                 className="gap-1 mx-auto"
                                 onClick={handleBack}
-                                disabled={form.formState.disabled || form.formState.isLoading}
+                                disabled={form.formState.disabled || form.formState.isSubmitting}
                             >
                                 <ChevronLeft className="h-4 w-4" />
                                 Go Back

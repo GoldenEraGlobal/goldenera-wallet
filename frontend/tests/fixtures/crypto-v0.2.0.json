@@ -1,0 +1,83 @@
+{
+  "warning": "PUBLIC deterministic fixtures only. Never send funds to these addresses or broadcast these signed transaction bytes.",
+  "baselineCryptoj": "0.2.0",
+  "seeds": [
+    {
+      "name": "bip39-public-zero-entropy-128-index0",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "passphrase": "",
+      "index": 0,
+      "address": "0x9858effd232b4033e47d90003d41ec34ecaeda94"
+    },
+    {
+      "name": "bip39-public-zero-entropy-256-index0",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "passphrase": "",
+      "index": 0,
+      "address": "0xf278cf59f82edcf871d630f28ecc8056f25c1cdb"
+    },
+    {
+      "name": "bip39-public-zero-entropy-128-index1",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "passphrase": "",
+      "index": 1,
+      "address": "0x6fac4d18c912343bf86fa7049364dd4e424ab9c0"
+    },
+    {
+      "name": "bip39-public-vector-passphrase",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "passphrase": "TREZOR",
+      "index": 0,
+      "address": "0x9c32f71d4db8fb9e1a58b0a80df79935e7256fa6"
+    }
+  ],
+  "transfers": [
+    {
+      "name": "native-mainnet-eight-decimals",
+      "seed": 0,
+      "recipient": "0x2222222222222222222222222222222222222222",
+      "tokenAddress": "0x0000000000000000000000000000000000000000",
+      "amount": "100000000",
+      "fee": "2500",
+      "nonce": "1",
+      "hash": "0x46b10e140d5067fc74e03b1cd4f698b0e02e61683b41f1e3bc2fb4d279bcca33",
+      "hex": "0xf8870186018bcfe568008080c101d5942222222222222222222222222222222222222222d5940000000000000000000000000000000000000000c58405f5e1008209c4c0c0c0b841b04b0cadbd06e5e555c6a34b938309a17db7551801c68896e651385d3d0fcb4e0055bec6231a0d56ecc3d4d52953be23ba227a26376f629b6ae5957e85418a791b"
+    },
+    {
+      "name": "custom-zero-decimals-one-unit",
+      "seed": 0,
+      "recipient": "0x2222222222222222222222222222222222222222",
+      "tokenAddress": "0x3333333333333333333333333333333333333333",
+      "amount": "1",
+      "fee": "2500",
+      "nonce": "2",
+      "hash": "0x6f22447a43ba8235f576a8488c09df08973c92c97a263f8980cd47f23adb7eaa",
+      "hex": "0xf8830186018bcfe568008080c102d5942222222222222222222222222222222222222222d5943333333333333333333333333333333333333333c1018209c4c0c0c0b84107f1efa2fef0063e9031aecb8da55dec2ec62227cb347fca49fd25e90f7886b51edc2864750d9a8440fb56ffa87edb0e0eb3e1b7ee7b26e866fc12eaa87b9f761c"
+    },
+    {
+      "name": "custom-large-integer",
+      "seed": 1,
+      "recipient": "0x5555555555555555555555555555555555555555",
+      "tokenAddress": "0x4444444444444444444444444444444444444444",
+      "amount": "1000000000000000000000000000000",
+      "fee": "987654",
+      "nonce": "12345",
+      "hash": "0xaf2437313d1b57c7355878b70d33041d6a47899972a6291d2bb3158f0611f555",
+      "hex": "0xf8930186018bcfe568008080c3823039d5945555555555555555555555555555555555555555d5944444444444444444444444444444444444444444ce8d0c9f2c9cd04674edea40000000830f1206c0c0c0b8410137a6a860add51795c58ecd46b729b4c309deb3b2a8cd73c51c5d86a9ee0b800742890c4b7c011f9279323f4a5793b0ce9553d3b706145ff4050613cef320661c"
+    }
+  ],
+  "vaults": [
+    {
+      "name": "legacy-v1-ascii-password",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "password": "PUBLIC-TEST-ONLY_password-123!",
+      "encrypted": "{\"v\":1,\"iv\":\"0102030405060708090a0b0c\",\"salt\":\"0102030405060708090a0b0c0d0e0f10\",\"data\":\"26f1eeb6aedbaf443e5c0c1276fb03fb042fbf513f1989b6146814c8aeb5fd2294ce9de161cdcf1b9556ab7bca4527274b389d412c4e199cad8a8469ad1938d76f5a17b3893ac8b30047459b3371a64c6af9ade526fdcad9c87d74452eb1a34ccad50207b1ad942a0277cbaa83\"}"
+    },
+    {
+      "name": "legacy-v1-unicode-password",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "password": "PUBLIC-TEST-ONLY_heslo_žluťoučký-123!",
+      "encrypted": "{\"v\":1,\"iv\":\"0102030405060708090a0b0c\",\"salt\":\"0102030405060708090a0b0c0d0e0f10\",\"data\":\"5735603b240ebf1023c4a03b37db4acd2a30b3224cdad111fe40b644f82761c476b2b3be9935e263767b3946dd112b063ad3fe8b0ba608bada11716565699293379d53b70fb3418a584bc84ae61da0ecc1b85f35a71c212c1dfb1330b50584e70279663307503df1b5b587402ec656974204c8affd3881d6f0707ee26491d8609bff75f35407cb820a3ce12969a7d17d51b1fe1ae34f76b5c1fb6a97cd2ac22fe4951c9a8eb59360b4b75f7d7c24771a9be2aedba8cb970069a6c5f5bf9843a6ba63086fce91468d332b0f\"}"
+    }
+  ]
+}

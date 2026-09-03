@@ -27,17 +27,13 @@ import static lombok.AccessLevel.PRIVATE;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import global.goldenera.wallet.repositories.DeviceRepository;
-import global.goldenera.wallet.repositories.TrackedAddressRepository;
-import global.goldenera.wallet.repositories.UserAccountRepository;
+import global.goldenera.wallet.properties.DeviceCleanupProperties;
+import global.goldenera.wallet.service.scheduler.DeviceCleanupBatchService.DeviceCleanupBatchOutcome;
+import global.goldenera.wallet.service.scheduler.DeviceCleanupBatchService.DeviceCleanupBatchResult;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -48,36 +44,100 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SubscriptionCleanupService {
 
-    DeviceRepository deviceRepository;
-    UserAccountRepository userAccountRepository;
-    TrackedAddressRepository trackedAddressRepository;
+    static final long INITIAL_CONTENTION_BACKOFF_MILLIS = 10;
+    static final long MAX_CONTENTION_BACKOFF_MILLIS = 100;
+
+    DeviceCleanupBatchService batchService;
+    DeviceCleanupProperties properties;
 
     @Scheduled(cron = "0 0 3 * * *")
-    @Transactional(rollbackFor = Exception.class)
     public void cleanupZombies() {
+        if (!properties.isEnabled()) {
+            log.info("Device cleanup is disabled until the registration-retirement rollout is complete.");
+            return;
+        }
+
         log.info("Starting zombie device cleanup task...");
-
         Instant threshold = Instant.now().minus(180, ChronoUnit.DAYS);
-        List<UUID> zombieDeviceIds = deviceRepository.findIdsByLastSeenAtBefore(threshold);
+        int batchSize = properties.getBatchSize();
+        int batchesExecuted = 0;
+        long selectedAccounts = 0;
+        long deletedAccounts = 0;
+        long selectedZeroAccountDevices = 0;
+        long deletedDevices = 0;
+        long deletedZeroAccountDevices = 0;
+        long deletedOrphans = 0;
+        boolean exhausted = false;
+        boolean retryInterrupted = false;
+        int consecutiveContendedBatches = 0;
+        int maxBatchesPerRun = properties.getMaxBatchesPerRun();
+        Long accountCursor = null;
 
-        if (zombieDeviceIds.isEmpty()) {
-            log.info("No zombie devices found. Cleanup finished.");
-            return;
+        for (int batch = 0; batch < maxBatchesPerRun; batch++) {
+            DeviceCleanupBatchOutcome outcome =
+                    batchService.cleanupBatchAfter(threshold, batchSize, accountCursor);
+            DeviceCleanupBatchResult result = outcome.result();
+            batchesExecuted++;
+            selectedAccounts += result.selectedAccounts();
+            deletedAccounts += result.deletedAccounts();
+            selectedZeroAccountDevices += result.selectedZeroAccountDevices();
+            deletedDevices += result.deletedDevices();
+            deletedZeroAccountDevices += result.deletedZeroAccountDevices();
+            deletedOrphans += result.deletedOrphans();
+
+            if (result.selectedAccounts() == 0) {
+                accountCursor = null;
+            } else if (accountCursor != null || result.deletedAccounts() < result.selectedAccounts()) {
+                accountCursor = outcome.lastSelectedAccountId();
+            }
+
+            if (outcome.exhaustionConfirmed()) {
+                exhausted = true;
+                break;
+            }
+
+            // Later device/address locks, initial SKIP LOCKED selection, and deletion
+            // rechecks may all lose races. A per-run account cursor prevents a
+            // persistently contended low ID from starving unrelated later rows.
+            if (result.didWork()) {
+                consecutiveContendedBatches = 0;
+            } else if (batch + 1 < maxBatchesPerRun) {
+                consecutiveContendedBatches++;
+                if (!backOffBeforeRetry(consecutiveContendedBatches)) {
+                    retryInterrupted = true;
+                    break;
+                }
+            }
         }
 
-        log.info("Found {} zombie devices. Analyzing impacted addresses...", zombieDeviceIds.size());
-        Set<Long> impactedAddressIds = userAccountRepository.findTrackedAddressIdsByDeviceIds(zombieDeviceIds);
-
-        deviceRepository.deleteAllByIdInBatch(zombieDeviceIds);
-        deviceRepository.flush();
-        log.info("Deleted {} zombie devices and their user accounts.", zombieDeviceIds.size());
-
-        if (impactedAddressIds.isEmpty()) {
-            log.info("No impacted addresses. Cleanup finished.");
-            return;
+        if (retryInterrupted) {
+            log.warn("Device cleanup retry was interrupted; remaining stale rows will be retried.");
+        } else if (!exhausted) {
+            log.warn("Device cleanup reached its per-run batch limit; remaining stale rows will be retried.");
         }
+        log.info(
+                "Device cleanup finished: batches={}, account-rows-selected={}, account-rows-deleted={}, "
+                        + "zero-account-devices-selected={}, devices-deleted={} (zero-account={}), "
+                        + "orphaned-addresses-deleted={}.",
+                batchesExecuted,
+                selectedAccounts,
+                deletedAccounts,
+                selectedZeroAccountDevices,
+                deletedDevices,
+                deletedZeroAccountDevices,
+                deletedOrphans);
+    }
 
-        int deletedOrphans = trackedAddressRepository.deleteOrphanedByIds(impactedAddressIds);
-        log.info("Deleted {} orphaned tracked addresses.", deletedOrphans);
+    private boolean backOffBeforeRetry(int consecutiveContendedBatches) {
+        int exponent = Math.min(consecutiveContendedBatches - 1, 4);
+        long delayMillis = Math.min(
+                INITIAL_CONTENTION_BACKOFF_MILLIS << exponent, MAX_CONTENTION_BACKOFF_MILLIS);
+        try {
+            Thread.sleep(delayMillis);
+            return true;
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 }

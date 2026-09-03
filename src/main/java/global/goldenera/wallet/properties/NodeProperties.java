@@ -23,11 +23,17 @@
  */
 package global.goldenera.wallet.properties;
 
+import java.time.Duration;
+import java.util.UUID;
+
+import org.hibernate.validator.constraints.time.DurationMax;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,9 +48,19 @@ public class NodeProperties {
     String baseUrl;
     @NotBlank
     String apiKey;
-    @NotBlank
-    String webhookUid;
+    @NotNull
+    UUID webhookUid;
     @NotBlank
     String webhookSecretKey;
+
+    @NotNull
+    @DurationMin(millis = 1)
+    @DurationMax(seconds = 10)
+    Duration connectTimeout = Duration.ofSeconds(2);
+
+    @NotNull
+    @DurationMin(millis = 1)
+    @DurationMax(seconds = 30)
+    Duration readTimeout = Duration.ofSeconds(3);
 
 }

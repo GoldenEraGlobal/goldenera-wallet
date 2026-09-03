@@ -1,11 +1,11 @@
-import { ActivityComponentType } from "@stackflow/react"
-import { Shield } from "lucide-react"
+import type { ActivityComponentType } from '@stackflow/react'
+import { Shield } from 'lucide-react'
 import { UnlockCard } from '../components/auth/UnlockCard'
 import { AppLayout } from '../layouts/Layouts'
-import { useFlow } from "../router/useFlow"
+import { useFlow } from '../router/useFlow'
 import { useWalletStore } from '../store/WalletStore'
 
-export const ToggleBiometricPage: ActivityComponentType = () => {
+export const ToggleBiometricPage: ActivityComponentType<'ToggleBiometricPage'> = () => {
     const { pop } = useFlow()
     const biometric = useWalletStore(state => state.biometric)
     const toggleBiometric = useWalletStore(state => state.toggleBiometric)

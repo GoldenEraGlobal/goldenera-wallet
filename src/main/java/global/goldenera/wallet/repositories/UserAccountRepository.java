@@ -23,11 +23,13 @@
  */
 package global.goldenera.wallet.repositories;
 
+import java.time.Instant;
 import java.util.Collection;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.ListPagingAndSortingRepository;
 import org.springframework.stereotype.Repository;
@@ -41,8 +43,45 @@ public interface UserAccountRepository
                 ListPagingAndSortingRepository<UserAccount, Long>,
                 JpaSpecificationExecutor<UserAccount> {
 
-        @Query("SELECT DISTINCT ua.trackedAddress.id FROM UserAccount ua WHERE ua.device.id IN :deviceIds")
-        Set<Long> findTrackedAddressIdsByDeviceIds(Collection<UUID> deviceIds);
+        @Query(nativeQuery = true, value = """
+                        SELECT ua.id AS "accountId",
+                               ua.device_id AS "deviceId",
+                               ua.tracked_address_id AS "trackedAddressId"
+                        FROM user_account ua
+                        JOIN device d ON d.id = ua.device_id
+                        WHERE d.last_seen_at < :threshold
+                        ORDER BY ua.id
+                        LIMIT :batchSize
+                        FOR UPDATE OF ua SKIP LOCKED
+                        """)
+        List<CleanupAccountRow> lockStaleAccountRowsForCleanup(Instant threshold, int batchSize);
+
+        @Query(nativeQuery = true, value = """
+                        SELECT ua.id AS "accountId",
+                               ua.device_id AS "deviceId",
+                               ua.tracked_address_id AS "trackedAddressId"
+                        FROM user_account ua
+                        JOIN device d ON d.id = ua.device_id
+                        WHERE d.last_seen_at < :threshold
+                          AND ua.id > :afterAccountId
+                        ORDER BY ua.id
+                        LIMIT :batchSize
+                        FOR UPDATE OF ua SKIP LOCKED
+                        """)
+        List<CleanupAccountRow> lockStaleAccountRowsAfterForCleanup(
+                        Instant threshold, long afterAccountId, int batchSize);
+
+        @Modifying(clearAutomatically = true, flushAutomatically = true)
+        @Query(nativeQuery = true, value = "DELETE FROM user_account WHERE id IN :accountIds")
+        int deleteCleanupAccountRows(Collection<Long> accountIds);
 
         long countByTrackedAddressId(Long trackedAddressId);
+
+        interface CleanupAccountRow {
+                Long getAccountId();
+
+                UUID getDeviceId();
+
+                Long getTrackedAddressId();
+        }
 }

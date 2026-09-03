@@ -23,7 +23,6 @@
  */
 package global.goldenera.wallet.config;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -31,20 +30,20 @@ import java.math.BigInteger;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.MapperFeature;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.JsonToken;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.ser.std.ToStringSerializer;
 
 import global.goldenera.cryptoj.common.Block;
 import global.goldenera.cryptoj.common.BlockHeader;
@@ -94,8 +93,7 @@ public class JacksonConfig {
 
 	@Bean
 	@Primary
-	public ObjectMapper baseObjectMapper(Jackson2ObjectMapperBuilder builder) {
-		ObjectMapper mapper = builder.createXmlMapper(false).build();
+	public JsonMapper baseObjectMapper(JsonMapper.Builder builder) {
 		SimpleModule module = new SimpleModule("GoldeneraCryptoModule");
 
 		// CUSTOM TYPES
@@ -131,10 +129,11 @@ public class JacksonConfig {
 		module.addAbstractTypeMapping(NetworkParamsState.class, NetworkParamsStateImpl.class);
 		module.addAbstractTypeMapping(TokenState.class, TokenStateImpl.class);
 
-		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-		mapper.registerModule(module);
-		return mapper;
+		return builder
+				.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+				.disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+				.addModule(module)
+				.build();
 	}
 
 	/**
@@ -168,9 +167,9 @@ public class JacksonConfig {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private void registerStringAdapter(SimpleModule module, GlobalTypeRegistry.StringTypeAdapter adapter) {
 		// SERIALIZER (Objekt -> JSON String)
-		module.addSerializer(adapter.getType(), new JsonSerializer<Object>() {
+		module.addSerializer(adapter.getType(), new ValueSerializer<Object>() {
 			@Override
-			public void serialize(Object value, JsonGenerator gen, SerializerProvider s) throws IOException {
+			public void serialize(Object value, JsonGenerator gen, SerializationContext s) {
 				if (value == null) {
 					gen.writeNull();
 				} else {
@@ -180,13 +179,13 @@ public class JacksonConfig {
 		});
 
 		// DESERIALIZER (JSON String -> Objekt)
-		module.addDeserializer(adapter.getType(), new JsonDeserializer<Object>() {
+		module.addDeserializer(adapter.getType(), new ValueDeserializer<Object>() {
 			@Override
-			public Object deserialize(JsonParser p, DeserializationContext c) throws IOException {
-				if (p.getCurrentToken() == JsonToken.VALUE_NULL)
+			public Object deserialize(JsonParser p, DeserializationContext c) {
+				if (p.currentToken() == JsonToken.VALUE_NULL)
 					return null;
 
-				String val = p.getValueAsString();
+				String val = p.getString();
 				if (val == null || val.trim().isEmpty())
 					return null;
 
@@ -205,9 +204,9 @@ public class JacksonConfig {
 			Method getCodeMethod = enumClass.getMethod("getCode");
 			Method fromCodeMethod = enumClass.getMethod("fromCode", int.class);
 
-			module.addSerializer(enumClass, new JsonSerializer() {
+			module.addSerializer(enumClass, new ValueSerializer() {
 				@Override
-				public void serialize(Object value, JsonGenerator gen, SerializerProvider s) throws IOException {
+				public void serialize(Object value, JsonGenerator gen, SerializationContext s) {
 					try {
 						if (value == null)
 							gen.writeNull();
@@ -219,13 +218,13 @@ public class JacksonConfig {
 				}
 			});
 
-			module.addDeserializer(enumClass, new JsonDeserializer() {
+			module.addDeserializer(enumClass, new ValueDeserializer() {
 				@Override
-				public Object deserialize(JsonParser p, DeserializationContext c) throws IOException {
-					if (p.getCurrentToken() == JsonToken.VALUE_NULL)
+				public Object deserialize(JsonParser p, DeserializationContext c) {
+					if (p.currentToken() == JsonToken.VALUE_NULL)
 						return null;
 					try {
-						return fromCodeMethod.invoke(null, p.getValueAsInt());
+						return fromCodeMethod.invoke(null, p.getIntValue());
 					} catch (Exception e) {
 						return null;
 					}

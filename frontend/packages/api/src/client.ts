@@ -1,27 +1,10 @@
-import axios, { type AxiosRequestConfig } from 'axios';
+import axios from 'axios'
+import { client } from './gen/.kubb/client'
 
+// The generated Kubb 5 transport must use the same origin and JSON defaults
+// as the previous custom client. Consumers may still configure this instance.
 export const axiosInstance = axios.create({
   baseURL: '/',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-export type RequestConfig<TData = unknown> = {
-  url?: string;
-  method?: string;
-  data?: TData;
-  params?: unknown;
-} & AxiosRequestConfig;
-
-export type ResponseErrorConfig<TError = unknown> = TError;
-
-export const customClient = async <TData, _TError = unknown, TVariables = unknown>(
-  config: RequestConfig<TVariables>
-) => {
-  const promise = axiosInstance.request<TData>(config);
-  const response = await promise;
-  return response;
-};
-
-export default customClient;
+  headers: { 'Content-Type': 'application/json' },
+})
+client.setConfig({ transport: axiosInstance, baseURL: '/', throwOnError: true })

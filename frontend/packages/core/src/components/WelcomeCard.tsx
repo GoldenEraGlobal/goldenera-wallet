@@ -1,12 +1,12 @@
-import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@project/ui"
-import { Download, Plus, Wallet } from "lucide-react"
-import { useFlow } from "../router/useFlow"
+import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@project/ui'
+import { Download, Plus, Wallet } from 'lucide-react'
+import { useFlow } from '../router/useFlow'
 
 export const WelcomeCard = () => {
     const { push } = useFlow()
 
     return (
-        <Card className="w-full max-w-sm">
+        <Card className="mx-auto w-full max-w-sm">
             <CardHeader className="text-center pb-2">
                 <a href="https://goldenera.global" target="_blank" rel="noopener noreferrer">
                     <Avatar className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">

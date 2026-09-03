@@ -1,0 +1,3 @@
+src/main/resources/static/** -diff -whitespace linguist-generated=true
+docs/reviews/**/evidence/** -whitespace linguist-generated=true
+docs/reviews/**/dependency-inventory.tsv -whitespace linguist-generated=true

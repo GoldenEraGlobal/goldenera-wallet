@@ -12,7 +12,7 @@ import {
     TooltipContent,
     TooltipTrigger
 } from '@project/ui'
-import { ActivityComponentType } from '@stackflow/react'
+import type { ActivityComponentType } from '@stackflow/react'
 import {
     ChevronRight,
     Copy,
@@ -31,8 +31,8 @@ import { useWalletStore } from '../store/WalletStore'
 import { shortenAddress } from '../utils/WalletUtil'
 
 
-export const SettingsPage: ActivityComponentType = () => {
-    const { copy, copied } = useCopy()
+export const SettingsPage: ActivityComponentType<'SettingsPage'> = () => {
+    const { copy, copied, copyFailed } = useCopy()
     const { push } = useFlow()
     const lockWallet = useWalletStore((state) => state.lockWallet)
     const address = useWalletStore((state) => state.address)
@@ -66,14 +66,14 @@ export const SettingsPage: ActivityComponentType = () => {
                             </ItemDescription>
                         </ItemContent>
                         <ItemActions>
-                            <Tooltip open={copied}>
+                            <Tooltip open={copied || copyFailed}>
                                 <TooltipTrigger onClick={copyAddress} render={(props) => (
                                     <Button {...props} variant="outline" size='icon'>
                                         <Copy />
                                     </Button>
                                 )} />
                                 <TooltipContent>
-                                    <p>{copied ? 'Copied!' : 'Copy'}</p>
+                                    <p role="status">{copyFailed ? 'Copy failed' : copied ? 'Copied!' : 'Copy'}</p>
                                 </TooltipContent>
                             </Tooltip>
                         </ItemActions>
@@ -120,8 +120,8 @@ export const SettingsPage: ActivityComponentType = () => {
                             </Item>
                         )}
                         <Item
-                            onClick={() => {
-                                lockWallet()
+                            onClick={async () => {
+                                try { await lockWallet() } catch { /* The store reports a local-only lock warning. */ }
                             }}
                             className="rounded-lg"
                             render={(props) => (

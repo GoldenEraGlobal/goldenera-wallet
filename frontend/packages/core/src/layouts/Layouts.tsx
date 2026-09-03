@@ -1,9 +1,11 @@
 import { Capacitor } from '@capacitor/core'
-import { cn, PullToRefresh } from "@project/ui"
-import { AppScreen, AppScreenProps } from "@stackflow/plugin-basic-ui"
-import { PropsWithChildren, useEffect } from "react"
+import { cn, PullToRefresh } from '@project/ui'
+import type { AppScreenProps } from '@stackflow/plugin-basic-ui'
+import { AppScreen } from '@stackflow/plugin-basic-ui'
+import type { PropsWithChildren} from 'react'
+import { useEffect } from 'react'
 import { DrawerDemo } from '../components/DevMenu'
-import { useRootContext } from "../router/RootContext"
+import { useRootContext } from '../router/RootContext'
 import { useFlow } from '../router/useFlow'
 
 const isNative = Capacitor.isNativePlatform()
@@ -107,16 +109,16 @@ export const AppLayout = ({
 const useGlobalBg = (enabled: boolean) => {
     useEffect(() => {
         if (enabled) {
-            document.documentElement.classList.add('bg-background');
-            document.body.classList.add('bg-background');
+            document.documentElement.classList.add('bg-background')
+            document.body.classList.add('bg-background')
         } else {
-            document.documentElement.classList.remove('bg-background');
-            document.body.classList.remove('bg-background');
+            document.documentElement.classList.remove('bg-background')
+            document.body.classList.remove('bg-background')
         }
 
         return () => {
-            document.documentElement.classList.remove('bg-background');
-            document.body.classList.remove('bg-background');
+            document.documentElement.classList.remove('bg-background')
+            document.body.classList.remove('bg-background')
         }
     }, [enabled])
 }

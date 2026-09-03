@@ -23,8 +23,6 @@
  */
 package global.goldenera.wallet.api.core.v1.device;
 
-import static lombok.AccessLevel.PRIVATE;
-
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,33 +31,41 @@ import org.springframework.web.bind.annotation.RestController;
 import global.goldenera.wallet.api.core.v1.device.dtos.DeviceDtoV1;
 import global.goldenera.wallet.api.core.v1.device.dtos.DeviceRegistrationRequestDtoV1;
 import global.goldenera.wallet.api.core.v1.device.mappers.DeviceMapper;
-import global.goldenera.wallet.entities.Device;
+import global.goldenera.wallet.properties.DeviceRegistrationProperties;
 import global.goldenera.wallet.service.business.DeviceBusinessService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/core/v1/device")
+@Tag(name = "Device API V1", description = "Retired device registration compatibility endpoint")
 @AllArgsConstructor
-@FieldDefaults(level = PRIVATE, makeFinal = true)
-@Slf4j
-@Tag(name = "Device API V1", description = "API for device registration and management")
 public class DeviceApiV1 {
 
     DeviceBusinessService deviceBusinessService;
     DeviceMapper deviceMapper;
+    DeviceRegistrationProperties properties;
 
     @PostMapping("/register")
-    @Operation(summary = "Register device", description = "Register a new device or update existing one")
+    @Operation(
+            summary = "Acknowledge legacy device registration",
+            description = "Rolling-retirement endpoint; persistence remains configurable until old backend replicas drain")
+    @ApiResponse(responseCode = "200", description = "Legacy registration acknowledged")
     public DeviceDtoV1 register(@RequestBody @Valid DeviceRegistrationRequestDtoV1 request) {
-        log.info("Registering device with client identifier: {}", request.clientIdentifier());
-        Device device = deviceMapper.toEntity(request);
-        Device registered = deviceBusinessService.registerDevice(device);
-        return deviceMapper.toDto(registered);
-    }
+        if (properties.isMutationsEnabled()) {
+            return deviceMapper.toDto(deviceBusinessService.registerDevice(deviceMapper.toEntity(request)));
+        }
 
+        return new DeviceDtoV1(
+                null,
+                request.clientIdentifier(),
+                request.platform(),
+                request.fcmToken(),
+                request.appVersion(),
+                null,
+                null);
+    }
 }

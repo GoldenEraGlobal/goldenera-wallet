@@ -1,0 +1,30 @@
+import { test, expect, importPublicWallet, openSettings, TEST_PASSWORD } from './fixtures'
+
+test('creates, backs up, reloads and unlocks a wallet', async ({ page }, testInfo) => {
+  testInfo.annotations.push({ type: 'browser-scope', description: 'Current Playwright engine smoke only; not a physical device or claimed minimum supported browser version.' })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Create New Wallet', exact: true }).click()
+  await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
+  await page.getByPlaceholder('Confirm your password', { exact: true }).fill(TEST_PASSWORD)
+  await page.getByRole('button', { name: 'Set Password', exact: true }).click()
+  await expect(page.getByText('Backup Recovery Phrase', { exact: true })).toBeVisible()
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Continue to Wallet', exact: true }).click()
+  await page.reload()
+  await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+})
+
+test('imports, navigates, locks, rejects a wrong password and unlocks', async ({ page }, testInfo) => {
+  testInfo.annotations.push({ type: 'browser-scope', description: 'Current Playwright engine smoke; PRF hardware and old-browser floor are outside this case.' })
+  await importPublicWallet(page)
+  await openSettings(page)
+  await page.getByRole('button', { name: /Lock Wallet/ }).click()
+  await page.getByPlaceholder('Enter your password', { exact: true }).fill(`${TEST_PASSWORD}-wrong`)
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  await expect(page.getByText('Invalid password', { exact: true })).toBeVisible()
+  await page.getByPlaceholder('Enter your password', { exact: true }).fill(TEST_PASSWORD)
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click()
+  await expect(page.getByText('Your Tokens', { exact: true })).toBeVisible()
+})

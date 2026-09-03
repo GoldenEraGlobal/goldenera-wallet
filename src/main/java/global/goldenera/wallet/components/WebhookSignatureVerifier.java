@@ -39,6 +39,7 @@ import org.springframework.stereotype.Component;
 
 import global.goldenera.wallet.exceptions.GERuntimeException;
 import global.goldenera.wallet.exceptions.GEValidationException;
+import global.goldenera.wallet.exceptions.WebhookAuthenticationException;
 import global.goldenera.wallet.properties.NodeProperties;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -70,12 +71,12 @@ public class WebhookSignatureVerifier {
      *            Value of X-Webhook-Timestamp header.
      * @param signature
      *            Value of X-Webhook-Signature header.
-     * @throws GEValidationException
+     * @throws WebhookAuthenticationException
      *             if verification fails.
      */
     public void verify(byte[] payloadBody, String timestamp, String signature) {
         if (timestamp == null || signature == null) {
-            throw new GEValidationException("Missing required webhook headers (Timestamp or Signature)");
+            throw new WebhookAuthenticationException("Missing required webhook headers (Timestamp or Signature)");
         }
 
         verifyTimestamp(timestamp);
@@ -85,8 +86,8 @@ public class WebhookSignatureVerifier {
         if (!MessageDigest.isEqual(
                 signature.getBytes(StandardCharsets.UTF_8),
                 calculatedSignature.getBytes(StandardCharsets.UTF_8))) {
-            log.warn("Invalid webhook signature. Received: {}, Calculated: {}", signature, calculatedSignature);
-            throw new GEValidationException("Invalid webhook signature");
+            log.warn("Invalid webhook signature");
+            throw new WebhookAuthenticationException("Invalid webhook signature");
         }
     }
 
@@ -94,13 +95,13 @@ public class WebhookSignatureVerifier {
         try {
             long eventTime = Long.parseLong(timestampStr);
             long now = Instant.now().getEpochSecond();
-            if (Math.abs(now - eventTime) > TOLERANCE_IN_SECONDS) {
+            if (eventTime < now - TOLERANCE_IN_SECONDS || eventTime > now + TOLERANCE_IN_SECONDS) {
                 log.error("Webhook timestamp rejected. Event Time: {}, Current Time: {}, Tolerance: {}",
                         eventTime, now, TOLERANCE_IN_SECONDS);
-                throw new GEValidationException("Webhook timestamp is outside of the tolerance window");
+                throw new WebhookAuthenticationException("Webhook timestamp is outside of the tolerance window");
             }
         } catch (NumberFormatException e) {
-            throw new GEValidationException("Invalid timestamp format");
+            throw new WebhookAuthenticationException("Invalid timestamp format");
         }
     }
 

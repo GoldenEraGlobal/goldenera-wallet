@@ -76,7 +76,7 @@ public class ExplorerNodeService {
     /**
      * Get account balance by address and optional token address.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public AccountBalanceDtoV1 getAccountBalanceByAddress(Address address, Address tokenAddress) {
         return accountBalanceApi
                 .apiV1AccountBalanceGetByAddressAndTokenContractAddress(address.toChecksumAddress(),
@@ -87,7 +87,7 @@ public class ExplorerNodeService {
     /**
      * Get total count of account balances.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getAccountBalanceCount() {
         return accountBalanceApi.apiV1AccountBalanceGetCount().getBody();
     }
@@ -95,9 +95,15 @@ public class ExplorerNodeService {
     /**
      * Get account balances in bulk for multiple addresses.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public AccountBalanceDtoV1Page getAccountBalancesBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses) {
+        return getAccountBalancesBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public AccountBalanceDtoV1Page getAccountBalancesBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
         var request = new BulkAccountBalancePageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)
@@ -111,7 +117,7 @@ public class ExplorerNodeService {
     /**
      * Get mempool transfer by hash.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public MemTransferDtoV1 getMemTransferByHash(Hash hash) {
         return memTransferApi.apiV1MemTransferGetByHash(hash.toHexString()).getBody();
     }
@@ -119,7 +125,7 @@ public class ExplorerNodeService {
     /**
      * Get total count of mempool transfers.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getMemTransferCount() {
         return memTransferApi.apiV1MemTransferGetCount().getBody();
     }
@@ -127,9 +133,15 @@ public class ExplorerNodeService {
     /**
      * Get mempool transfers in bulk for multiple addresses.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public MemTransferDtoV1Page getMemTransfersBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses, TransferTypeEnum transferType) {
+        return getMemTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses, transferType);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public MemTransferDtoV1Page getMemTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses, TransferTypeEnum transferType) {
         var request = new BulkMemTransferPageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)
@@ -140,12 +152,32 @@ public class ExplorerNodeService {
         return memTransferApi.apiV1MemTransferGetPageBulk(request).getBody();
     }
 
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
+    public MemTransferDtoV1Page getOutgoingMemTransfersBulk(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
+        return getOutgoingMemTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public MemTransferDtoV1Page getOutgoingMemTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses) {
+        var request = new BulkMemTransferPageRequestV1().pageNumber(pageNumber).pageSize(pageSize)
+                .direction(BulkMemTransferPageRequestV1.DirectionEnum.DESC)
+                .fromAddresses(addresses.stream().map(Address::toChecksumAddress).collect(Collectors.toSet()));
+        if (!tokenAddresses.isEmpty()) {
+            request.tokenAddresses(tokenAddresses.stream()
+                    .map(Address::toChecksumAddress)
+                    .collect(Collectors.toSet()));
+        }
+        return memTransferApi.apiV1MemTransferGetPageBulk(request).getBody();
+    }
+
     // ==================== Transfer API ====================
 
     /**
      * Get confirmed transfer by id.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TransferDtoV1 getTransferById(Long id) {
         return transferApi.apiV1TransferGetById(id).getBody();
     }
@@ -153,7 +185,7 @@ public class ExplorerNodeService {
     /**
      * Get total count of confirmed transfers.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getTransferCount() {
         return transferApi.apiV1TransferGetCount().getBody();
     }
@@ -161,9 +193,15 @@ public class ExplorerNodeService {
     /**
      * Get confirmed transfers in bulk for multiple addresses.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TransferDtoV1Page getTransfersBulk(Integer pageNumber, Integer pageSize, Set<Address> addresses,
             Set<Address> tokenAddresses, BulkTransferPageRequestV1.TypeEnum transferType) {
+        return getTransfersBulkForObservation(pageNumber, pageSize, addresses, tokenAddresses, transferType);
+    }
+
+    /** Single-attempt page read owned by the wallet request-wide observation budget. */
+    public TransferDtoV1Page getTransfersBulkForObservation(Integer pageNumber, Integer pageSize,
+            Set<Address> addresses, Set<Address> tokenAddresses, BulkTransferPageRequestV1.TypeEnum transferType) {
         var request = new BulkTransferPageRequestV1()
                 .pageNumber(pageNumber)
                 .pageSize(pageSize)
@@ -179,7 +217,7 @@ public class ExplorerNodeService {
     /**
      * Get transaction by hash.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TxDtoV1 getTxByHash(Hash hash) {
         return txApi.apiV1TxGetByHash(hash.toHexString()).getBody();
     }
@@ -187,7 +225,7 @@ public class ExplorerNodeService {
     /**
      * Get transaction confirmations by hash.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getTxConfirmationsByHash(Hash hash) {
         return txApi.apiV1TxGetConfirmationsByHash(hash.toHexString()).getBody();
     }
@@ -195,7 +233,7 @@ public class ExplorerNodeService {
     /**
      * Get total count of transactions.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getTxCount() {
         return txApi.apiV1TxGetCount().getBody();
     }
@@ -205,7 +243,7 @@ public class ExplorerNodeService {
     /**
      * Get token by address.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TokenDtoV1 getTokenByAddress(Address address) {
         return tokenApi.apiV1TokenGetByAddress(address.toChecksumAddress()).getBody();
     }
@@ -213,7 +251,7 @@ public class ExplorerNodeService {
     /**
      * Get total count of tokens.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public Long getTokenCount() {
         return tokenApi.apiV1TokenGetCount().getBody();
     }
@@ -221,7 +259,7 @@ public class ExplorerNodeService {
     /**
      * Get paginated list of tokens.
      */
-    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 500))
+    @Retryable(retryFor = ResourceAccessException.class, maxAttempts = 3, backoff = @Backoff(delay = 250))
     public TokenDtoV1Page getTokenPage(Integer pageNumber, Integer pageSize) {
         return tokenApi.apiV1TokenGetPage(pageNumber, pageSize, null, null, null, null, null, null, null, null, null,
                 null, null).getBody();

@@ -105,7 +105,9 @@ export const test = base.extend<{ api: MockApi }>({
       }
       if (url.pathname.endsWith('/wallet/next-nonce')) return reply(String(api.submitted.length + 1))
       if (url.pathname.endsWith('/wallet/mempool-recommended-fees')) {
-        const fee = { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' }
+        const fee = {
+          baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500',
+        }
         return reply({ fast: fee, standard: fee, slow: fee })
       }
       if (url.pathname.endsWith('/wallet/transfers')) {

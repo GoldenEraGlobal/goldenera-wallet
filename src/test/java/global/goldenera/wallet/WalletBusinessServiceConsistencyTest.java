@@ -111,6 +111,8 @@ class WalletBusinessServiceConsistencyTest {
                 feeLevel("01", "1", "1"),
                 feeLevel("1", "-1", "1"),
                 feeLevel("1", "1", null),
+                feeLevel("1", "1", "1").minimumTotalFee(null),
+                feeLevel("1", "1", "1").miningFeePerByte(overflow),
                 feeLevel(overflow, "1", "1"));
         for (FeeLevel invalid : invalidLevels) {
             assertThatThrownBy(() -> mapper.toMempoolRecommendedFeesDtoV1(
@@ -920,6 +922,8 @@ class WalletBusinessServiceConsistencyTest {
         return new FeeLevel()
                 .baseFee(baseFee)
                 .feePerByte(feePerByte)
+                .minimumTotalFee(totalForAverageTx)
+                .miningFeePerByte(feePerByte)
                 .totalForAverageTx(totalForAverageTx);
     }
 

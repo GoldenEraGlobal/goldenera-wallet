@@ -53,6 +53,8 @@ class WalletRecommendedFeesApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slow.baseFee").value(maximum))
                 .andExpect(jsonPath("$.standard.feePerByte").value(maximum))
+                .andExpect(jsonPath("$.standard.minimumTotalFee").value(maximum))
+                .andExpect(jsonPath("$.standard.miningFeePerByte").value(maximum))
                 .andExpect(jsonPath("$.fast.totalForAverageTx").value(maximum))
                 .andExpect(jsonPath("$.mempoolSize").value("0"));
     }
@@ -73,6 +75,8 @@ class WalletRecommendedFeesApiTest {
                         .standard(valid)
                         .fast(feeLevel("1", "2", null))
                         .mempoolSize(0L),
+                recommended(feeLevel("1", "2", "3").minimumTotalFee(null)),
+                recommended(feeLevel("1", "2", "3").miningFeePerByte(overflow)),
                 recommended(feeLevel(overflow, "2", "3")),
                 new RecommendedFeesDtoV1()
                         .slow(valid)
@@ -106,6 +110,8 @@ class WalletRecommendedFeesApiTest {
         return new FeeLevel()
                 .baseFee(baseFee)
                 .feePerByte(feePerByte)
+                .minimumTotalFee(totalForAverageTx)
+                .miningFeePerByte(feePerByte)
                 .totalForAverageTx(totalForAverageTx);
     }
 }

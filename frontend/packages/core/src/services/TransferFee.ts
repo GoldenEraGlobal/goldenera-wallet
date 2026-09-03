@@ -20,12 +20,16 @@ const canonicalFeeSchema = z.string().max(78).regex(/^(0|[1-9][0-9]*)$/)
 const recommendationSchema = z.object({
   baseFee: canonicalFeeSchema,
   feePerByte: canonicalFeeSchema,
+  minimumTotalFee: canonicalFeeSchema,
+  miningFeePerByte: canonicalFeeSchema,
   totalForAverageTx: canonicalFeeSchema,
 }).strict()
 
 export interface TransferFeeRecommendation {
   baseFee: string
   feePerByte: string
+  minimumTotalFee: string
+  miningFeePerByte: string
   totalForAverageTx: string
 }
 
@@ -90,6 +94,8 @@ export function solveTransferFee(
   const parsed = recommendationSchema.parse(recommendation)
   const baseFee = parseUint256(parsed.baseFee, 'baseFee')
   const feePerByte = parseUint256(parsed.feePerByte, 'feePerByte')
+  const minimumTotalFee = parseUint256(parsed.minimumTotalFee, 'minimumTotalFee')
+  const miningFeePerByte = parseUint256(parsed.miningFeePerByte, 'miningFeePerByte')
   const averageTotal = parseUint256(parsed.totalForAverageTx, 'totalForAverageTx')
   let candidate = averageTotal
   const observed = new Set<bigint>()
@@ -99,7 +105,9 @@ export function solveTransferFee(
     observed.add(candidate)
     const estimatedSignedSize = validateEstimatedSize(estimateSignedSize(candidate))
     const sizeFee = checkedFee(baseFee + feePerByte * BigInt(estimatedSignedSize))
-    const next = sizeFee > averageTotal ? sizeFee : averageTotal
+    const miningFee = checkedFee(miningFeePerByte * BigInt(estimatedSignedSize))
+    const next = [minimumTotalFee, sizeFee, miningFee]
+      .reduce((maximum, fee) => fee > maximum ? fee : maximum)
     if (next === candidate) return { fee: candidate, estimatedSignedSize, iterations: iteration }
     candidate = next
   }

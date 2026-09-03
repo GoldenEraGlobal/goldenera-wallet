@@ -24,5 +24,19 @@ export type MempoolRecommendedFeesLevelDtoV1 = {
      * @pattern ^(0|[1-9][0-9]*)$
      * @type string
     */
+    minimumTotalFee: string;
+    /**
+     * @minLength 0
+     * @maxLength 78
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
+    */
+    miningFeePerByte: string;
+    /**
+     * @minLength 0
+     * @maxLength 78
+     * @pattern ^(0|[1-9][0-9]*)$
+     * @type string
+    */
     totalForAverageTx: string;
 };

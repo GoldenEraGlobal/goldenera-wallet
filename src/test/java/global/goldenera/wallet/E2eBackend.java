@@ -96,7 +96,12 @@ public final class E2eBackend {
             return Map.of("nextNonce", 1, "nonce", 0, "pendingTxCount", 0, "nativeBalance", "100000000000");
         }
         if (path.endsWith("/recommended-fees")) {
-            var level = Map.of("baseFee", "100", "feePerByte", "1", "totalForAverageTx", "250");
+            var level = Map.of(
+                    "baseFee", "100",
+                    "feePerByte", "1",
+                    "minimumTotalFee", "250",
+                    "miningFeePerByte", "0",
+                    "totalForAverageTx", "250");
             return Map.of("slow", level, "standard", level, "fast", level, "mempoolSize", 0);
         }
         if (path.endsWith("/mempool/submit")) {

@@ -51,7 +51,9 @@ const recipient = '0x2222222222222222222222222222222222222222'
 const token = '0x3333333333333333333333333333333333333333'
 const otherToken = '0x4444444444444444444444444444444444444444'
 const now = 1_700_000_000_000
-const recommendation = { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' }
+const recommendation = {
+  baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500',
+}
 const keyA = PrivateKey.fromMnemonic(golden.seeds[0].mnemonic, golden.seeds[0].passphrase, golden.seeds[0].index)
 const keyB = PrivateKey.fromMnemonic(golden.seeds[1].mnemonic, golden.seeds[1].passphrase, golden.seeds[1].index)
 const senderA = keyA.getAddress().toLowerCase()
@@ -446,7 +448,7 @@ describe('TransferCoordinator final authorization and dispatch', () => {
       tokenAddresses: [token, native],
     }, expect.any(AbortSignal))
 
-    environment.setFees({ ...recommendation, totalForAverageTx: '5000' })
+    environment.setFees({ ...recommendation, minimumTotalFee: '5000', totalForAverageTx: '5000' })
     const result = await environment.coordinator.confirm(fastReview)
     expect(result.kind).toBe('reconfirm')
     if (result.kind === 'reconfirm') {

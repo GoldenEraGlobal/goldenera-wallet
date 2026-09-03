@@ -138,9 +138,9 @@ describe('production TransferCoordinator dependencies', () => {
       { address: sender, tokenAddress: native, balance: '1000000' },
     ] })
     api.getMempoolRecommendedFees.mockResolvedValue({ data: {
-      slow: { baseFee: '1', feePerByte: '1', totalForAverageTx: '150' },
-      standard: { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' },
-      fast: { baseFee: '2000', feePerByte: '20', totalForAverageTx: '5000' },
+      slow: { baseFee: '1', feePerByte: '1', minimumTotalFee: '150', miningFeePerByte: '0', totalForAverageTx: '150' },
+      standard: { baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500' },
+      fast: { baseFee: '2000', feePerByte: '20', minimumTotalFee: '5000', miningFeePerByte: '0', totalForAverageTx: '5000' },
     } })
     const authorization = getCurrentWalletAuthorizationSnapshot()
     const review = await transferCoordinator.prepare({
@@ -167,9 +167,9 @@ describe('production TransferCoordinator dependencies', () => {
       { address: sender, tokenAddress: native, balance: '1000000' },
     ] })
     api.getMempoolRecommendedFees.mockResolvedValue({ data: {
-      slow: { baseFee: '1', feePerByte: '1', totalForAverageTx: '150' },
-      standard: { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' },
-      fast: { baseFee: '2000', feePerByte: '20', totalForAverageTx: '5000' },
+      slow: { baseFee: '1', feePerByte: '1', minimumTotalFee: '150', miningFeePerByte: '0', totalForAverageTx: '150' },
+      standard: { baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500' },
+      fast: { baseFee: '2000', feePerByte: '20', minimumTotalFee: '5000', miningFeePerByte: '0', totalForAverageTx: '5000' },
     } })
 
     const review = await transferCoordinator.prepare({
@@ -192,7 +192,9 @@ describe('production TransferCoordinator dependencies', () => {
       feeLevel: 'standard',
       nodeNextNonce: '7',
       nonce: '7',
-      recommendation: { baseFee: '1000', feePerByte: '10', totalForAverageTx: '2500' },
+      recommendation: {
+        baseFee: '1000', feePerByte: '10', minimumTotalFee: '2500', miningFeePerByte: '0', totalForAverageTx: '2500',
+      },
     })
     expect(api.getNextNonce).toHaveBeenCalledWith({
       query: { address: sender },

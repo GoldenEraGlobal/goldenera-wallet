@@ -59,9 +59,18 @@ test('MAINNET read-only: real token UI, account/history/fees and validation erro
 
   const fees = await get('/api/core/v1/wallet/mempool-recommended-fees')
   expect(fees.status()).toBe(200)
-  const feeData = await fees.json() as Record<string, { baseFee?: string; feePerByte?: string; totalForAverageTx?: string }>
+  const feeData = await fees.json() as Record<string, {
+    baseFee?: string
+    feePerByte?: string
+    minimumTotalFee?: string
+    miningFeePerByte?: string
+    totalForAverageTx?: string
+  }>
   for (const level of ['slow', 'standard', 'fast']) {
     expect(feeData[level]).toBeTruthy()
+    expect(Object.keys(feeData[level] ?? {})).toEqual(expect.arrayContaining([
+      'baseFee', 'feePerByte', 'minimumTotalFee', 'miningFeePerByte', 'totalForAverageTx',
+    ]))
     for (const value of Object.values(feeData[level])) if (typeof value === 'string') expect(value).toMatch(/^\d+$/)
   }
 
